@@ -23,8 +23,10 @@ export const DEFAULT_LOGIN_OPTIONS: LoginOptions = {
       case "scaned":
         console.log("\n👀 已扫码，请在手机微信上点击确认登录...");
         break;
-      case "scaned_but_redirect":
       case "confirmed":
+        console.log("\n已链接, 但需手动在微信发送第一条消息后, bot 才能正常回复");
+        break;
+      case "scaned_but_redirect":
         console.log(`\n[系统] ${payload.message}`);
         break;
     }

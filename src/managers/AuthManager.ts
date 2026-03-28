@@ -116,6 +116,7 @@ export class AuthManager {
             if (data.baseurl) {
               this.core.setBaseUrl(data.baseurl);
             }
+            console.warn("debug", data);
 
             // 返回凭据给开发者，以便他们持久化存储
             return {

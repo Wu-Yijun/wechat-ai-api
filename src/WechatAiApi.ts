@@ -8,6 +8,7 @@ import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
 import type { LoginOptions, WeChatClientConfig } from "./types.ts";
 import { MessageManager } from "./managers/MessageManager.ts";
 import { CdnManager } from "./managers/CdnManager.ts";
+import { mergeObjects } from "./core/utils.ts";
 
 // 导出的凭证接口，通常等于 LoginResult，但在外层改个名字语义更清晰
 export interface LoginCredentials {
@@ -30,7 +31,7 @@ export class WeChatBot extends EventEmitter {
     super(); // 初始化 EventEmitter
 
     // 合并默认配置和用户配置
-    const mergedConfig = { ...DEFAULT_CLIENT_CONFIG, ...config };
+    const mergedConfig =  mergeObjects(DEFAULT_CLIENT_CONFIG, config);
 
     // 初始化网络底层
     this.core = new WeChatCore(mergedConfig);
@@ -61,7 +62,7 @@ export class WeChatBot extends EventEmitter {
    */
   public async login(options: Partial<LoginOptions> = DEFAULT_LOGIN_OPTIONS): Promise<LoginCredentials> {
     // 默认的“无脑”交互实现
-    const defaultOptions = {...DEFAULT_LOGIN_OPTIONS, ...options};
+    const defaultOptions = mergeObjects(DEFAULT_LOGIN_OPTIONS, options);
 
     // 执行底层的登录逻辑
     const result = await this.auth.login(defaultOptions);
@@ -100,6 +101,8 @@ export class WeChatBot extends EventEmitter {
     // 同步给底层 HTTP 引擎
     this.core.setToken(credentials.token);
     this.core.setBaseUrl(credentials.baseUrl);
+
+    this.messages.setUserId(credentials.userId);
 
     console.log(
       `[WeChatBot] 成功加载凭证 (AccountID: ${credentials.accountId})`,

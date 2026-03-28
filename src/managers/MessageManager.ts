@@ -33,6 +33,11 @@ export interface SendMediaOptions extends SendMessageOptions {
   caption?: string;
 }
 
+interface SendResult {
+  clientId: string;
+  response: any; // 微信服务器的原始响应，未来可以根据需要定义更具体的类型
+}
+
 export class MessageManager {
   private core: WeChatCore;
   private cdn: CdnManager;
@@ -54,7 +59,7 @@ export class MessageManager {
   // 公开 API: 发送纯文本
   // ==========================================
 
-  public async sendText(text: string, options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS): Promise<string> {
+  public async sendText(text: string, options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
     const textItem = {
       type: MessageItemType.TEXT,
       text_item: { text },
@@ -67,17 +72,17 @@ export class MessageManager {
   // 公开 API: 发送媒体文件
   // ==========================================
 
-  public async sendImage(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<string> {
+  public async sendImage(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
     return this._sendMediaWorkflow(filePath, UploadMediaType.IMAGE, mergedOptions);
   }
 
-  public async sendVideo(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<string> {
+  public async sendVideo(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
     return this._sendMediaWorkflow(filePath, UploadMediaType.VIDEO, mergedOptions);
   }
 
-  public async sendFile(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<string> {
+  public async sendFile(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
     return this._sendMediaWorkflow(filePath, UploadMediaType.FILE, mergedOptions);
   }
@@ -93,7 +98,7 @@ export class MessageManager {
     filePath: string,
     mediaType: UploadMediaType,
     options: SendMediaOptions
-  ): Promise<string> {
+  ): Promise<SendResult> {
 
     // 1. 读取本地文件为 Buffer
     const buffer = await fs.readFile(filePath);
@@ -146,7 +151,7 @@ export class MessageManager {
   /**
    * 最底层的发包函数，将组装好的 Item 包装成完整的微信请求体并 POST
    */
-  private async _sendRawItem(itemObj: any, userId: string, contextToken?: string): Promise<string> {
+  private async _sendRawItem(itemObj: any, userId: string, contextToken?: string): Promise<SendResult> {
     const clientId = this._generateClientId();
 
     const requestBody: any = {
@@ -161,13 +166,13 @@ export class MessageManager {
       }
     };
 
-    await this.core.request("ilink/bot/sendmessage", {
+    const response  = await this.core.request("ilink/bot/sendmessage", {
       method: "POST",
       body: requestBody,
       timeoutMs: 15000,
     });
 
-    return clientId;
+    return {clientId, response};
   }
 
   /** * 生成去重的客户端消息 ID 
