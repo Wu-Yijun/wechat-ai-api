@@ -82,6 +82,8 @@ export class MessageManager {
     return this._sendMediaWorkflow(filePath, UploadMediaType.VIDEO, mergedOptions);
   }
 
+  /** - 仅允许发送文件, 发送**图片或视频**会导致发送失败!
+    * - 发送图片和视频应使用 `sendImage` 或 `sendVideo` */
   public async sendFile(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
     return this._sendMediaWorkflow(filePath, UploadMediaType.FILE, mergedOptions);
@@ -115,7 +117,7 @@ export class MessageManager {
     // 4. 组装媒体 Item 载荷
     const mediaObj = {
       encrypt_query_param: ticket.encryptedQueryParam,
-      aes_key: Buffer.from(ticket.aeskeyHex, "hex").toString("base64"), // JSON 中要求 base64 格式
+      aes_key: Buffer.from(ticket.aeskeyHex).toString("base64"), // JSON 中要求 base64 格式
       encrypt_type: 1,
     };
 

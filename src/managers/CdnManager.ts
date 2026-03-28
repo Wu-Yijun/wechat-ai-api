@@ -112,7 +112,6 @@ export class CdnManager {
         const res = await fetch(cdnUrl, {
           method: "POST",
           headers: { "Content-Type": "application/octet-stream" },
-          // 注意：fetch 接收 Uint8Array 性能更好，兼容性更强
           body: new Uint8Array(ciphertext), 
         });
 

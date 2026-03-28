@@ -1,4 +1,5 @@
-export function mergeObjects<T>(target: T, ...sources: Partial<T>[]): T {
+export function mergeObjects<T>(ref: T, ...sources: Partial<T>[]): T {
+  const target = { ...ref };
   for (const source of sources) {
     for (const key in source) {
       if (source[key] !== undefined) {

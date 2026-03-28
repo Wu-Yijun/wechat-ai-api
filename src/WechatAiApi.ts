@@ -75,6 +75,10 @@ export class WeChatBot extends EventEmitter {
     return this.currentCredentials;
   }
 
+  public async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   // ==========================================
   // 2. 凭证管理模块 (导入 / 导出 / 验证)
   // ==========================================
