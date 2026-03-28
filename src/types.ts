@@ -105,6 +105,8 @@ export interface WeChatIncomingMessage{
    * 如果关闭了，此方法会发起网络请求下载并解密，然后缓存。
    */
   getBuffer?: () => Promise<Buffer | null>;
+  /** 获取语音消息的二进制 Buffer, 这是原始的 SILK 编码 */
+  getVoiceBuffer?: () => Promise<Buffer | null>;
   /**
    * 快捷方法：将媒体文件保存到本地磁盘。
    * @param savePath 指定绝对或相对路径

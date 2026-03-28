@@ -23,18 +23,26 @@ async function main() {
 
   bot.on("file", async (msg) => {
     console.log("收到一个文件", msg);
+    const name = msg.fileName || `file_${Date.now()}`;
+    console.log("保存到本地", await msg.saveToFile!(`./temp/${name}`));
   });
 
   bot.on("image", async (msg) => {
     console.log("收到一张图片", msg);
+    const name = msg.fileName || `image_${Date.now()}.jpg`;
+    console.log("保存到本地", await msg.saveToFile!(`./temp/${name}`));
   });
 
   bot.on("video", async (msg) => {
     console.log("收到一个视频", msg);
+    const name = msg.fileName || `video_${Date.now()}.mp4`;
+    console.log("保存到本地", await msg.saveToFile!(`./temp/${name}`));
   });
 
   bot.on("voice", async (msg) => {
     console.log("收到一段语音", msg);
+    const name = msg.fileName || `voice_${Date.now()}.wav`;
+    console.log("保存到本地", await msg.saveToFile!(`./temp/${name}`));
   });
 }
 

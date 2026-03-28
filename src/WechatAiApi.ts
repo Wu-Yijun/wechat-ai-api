@@ -1,15 +1,14 @@
-// src/WeChatBot.ts
 import { EventEmitter } from "node:events";
+import { writeFile } from "node:fs/promises";
+
 import { WeChatCore } from "./core/WeChatCore.ts";
-import {
-  AuthManager,
-} from "./managers/AuthManager.ts";
+import { AuthManager } from "./managers/AuthManager.ts";
 import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
-import { type  CdnDownloadTicket, type ItemType,  type LoginOptions, type WeChatClientConfig, type WeChatIncomingMessage } from "./types.ts";
+import type { CdnDownloadTicket, ItemType, LoginOptions, WeChatClientConfig, WeChatIncomingMessage } from "./types.ts";
 import { MessageManager } from "./managers/MessageManager.ts";
 import { CdnManager } from "./managers/CdnManager.ts";
 import { getItemType, mergeObjects } from "./core/utils.ts";
-import { writeFile } from "node:fs/promises";
+import { silkToWav } from "./core/SilkConverter.ts";
 
 // 导出的凭证接口，通常等于 LoginResult，但在外层改个名字语义更清晰
 export interface LoginCredentials {
@@ -26,6 +25,7 @@ interface WeChatBotEventMap {
   file: [msg: WeChatIncomingMessage];
   image: [msg: WeChatIncomingMessage];
   video: [msg: WeChatIncomingMessage];
+  voice: [msg: WeChatIncomingMessage];
   error: [error: Error];
 }
 
@@ -40,7 +40,7 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
 
   private isPolling: boolean = false;
   private syncBuf: string = ""; // 极其重要：状态同步游标
-  
+
   private autoDownloadMedia: boolean;
 
   constructor(config: Partial<WeChatClientConfig> = DEFAULT_CLIENT_CONFIG) {
@@ -284,6 +284,17 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
           cachedBuffer = await this.cdn.downloadBuffer(ticket);
           return cachedBuffer;
         };
+        if (itemType === "voice") {
+          msgCopy.getVoiceBuffer = msgCopy.getBuffer; // 语音消息的原始 Buffer 是 SILK 编码
+          let pcmCachedBuffer: Buffer | null = null;
+          msgCopy.getBuffer = async () => {
+            if (pcmCachedBuffer) return pcmCachedBuffer;
+            const silk_buffer = await msgCopy.getVoiceBuffer!();
+            if (!silk_buffer) return null;
+            pcmCachedBuffer = await silkToWav(silk_buffer);
+            return pcmCachedBuffer;
+          };
+        }
         msgCopy.saveToFile = async (savePath: string) => {
           const buf = await msgCopy.getBuffer!();
           if (!buf) throw new Error("无媒体内容可保存");
@@ -309,21 +320,22 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
    * 从原始 JSON 中提取标准化的 CDN 下载票据
    */
   private _extractDownloadTicket(item: any, itemType: ItemType): CdnDownloadTicket | undefined {
-    if(itemType === "text" || itemType === "unknown") return undefined; // 纯文本没有下载票
+    if (itemType === "text" || itemType === "unknown") return undefined; // 纯文本没有下载票
 
-    if (!item.media) return undefined;
-    const media = item.media;
+    const file_item = item.image_item ?? item.file_item ?? item.video_item ?? item.voice_item;
+    if (!file_item || !file_item.media) return undefined;
+    const media = file_item.media;
 
     // 如果连基本的下载参数都没有，直接放弃
     if (!media.encrypt_query_param && !media.full_url) return undefined;
 
     // 2. 抹平 AES 密钥的特权差异
     let aesKeyBase64 = media.aes_key;
-    
+
     // ⚠️ 协议特例：图片类型有时会把密钥放在外层，而且是 Hex 格式
-    if (itemType === "image" && item.aeskey) {
+    if (itemType === "image" && file_item.aeskey) {
       // 统一转成 Base64，方便 CdnManager 统一处理
-      aesKeyBase64 = Buffer.from(item.aeskey, "hex").toString("base64");
+      aesKeyBase64 = Buffer.from(file_item.aeskey, "hex").toString("base64");
     }
 
     // 3. 判断是否为明文传输 (某些情况下微信图片没有 aes_key)
@@ -335,7 +347,7 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
       encryptedQueryParam: media.encrypt_query_param,
       aesKeyBase64,
       isPlain,
-      originalFileName: item.file_name // 仅针对文件类型有效
+      originalFileName: file_item.file_name || file_item.originalFileName,
     };
   }
 
