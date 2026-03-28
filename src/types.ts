@@ -22,8 +22,6 @@ export interface CoreRequestOptions {
   timeoutMs: number;
 }
 
-
-
 export interface QrCodeInfo {
   qrcodeId: string;
   qrcodeUrl: string; // 用于生成图片的原始字符串/链接
@@ -69,25 +67,25 @@ export interface LoginOptions {
 /** 内部流转的 CDN 文件凭据 (CdnManager 产出，MessageManager 消费) */
 export interface CdnFileTicket {
   filekey: string;
-  aeskeyHex: string;          // 给 MessageManager 拼 JSON 用的 hex
-  aeskeyBuffer: Buffer;       // 未来下载解密用的 buffer
-  fileSizePlain: number;      // 明文大小
-  fileSizeCipher: number;     // 加密后大小
-  encryptedQueryParam: string;// 核心下载参数
+  aeskeyHex: string; // 给 MessageManager 拼 JSON 用的 hex
+  aeskeyBuffer: Buffer; // 未来下载解密用的 buffer
+  fileSizePlain: number; // 明文大小
+  fileSizeCipher: number; // 加密后大小
+  encryptedQueryParam: string; // 核心下载参数
 }
 
 /** 统一的 CDN 下载票据 (抹平了图片、文件、视频的差异) */
 export interface CdnDownloadTicket {
   mediaType: "image" | "video" | "file" | "voice";
-  fullUrl?: string;               // 优先级 1
-  encryptedQueryParam?: string;   // 优先级 2
-  aesKeyBase64?: string;          // 密钥 (已统一转为 base64 处理好的)
-  isPlain: boolean;               // 是否是明文传输 (针对某些没有 aes_key 的图片)
-  originalFileName?: string;      // 针对文件
+  fullUrl?: string; // 优先级 1
+  encryptedQueryParam?: string; // 优先级 2
+  aesKeyBase64?: string; // 密钥 (已统一转为 base64 处理好的)
+  isPlain: boolean; // 是否是明文传输 (针对某些没有 aes_key 的图片)
+  originalFileName?: string; // 针对文件
 }
 
 // 对外暴露的消息对象结构
-export interface WeChatIncomingMessage{
+export interface WeChatIncomingMessage {
   messageId: string;
   seq: number;
   fromUserId: string;
@@ -120,7 +118,6 @@ export interface WeChatIncomingMessage{
   raw: any;
 }
 
-
 export const MessageType = {
   NONE: 0,
   USER: 1,
@@ -149,8 +146,16 @@ export const UploadMediaType = {
   VOICE: 4,
 } as const;
 export type MessageType = typeof MessageType[keyof typeof MessageType];
-export type MessageItemType = typeof MessageItemType[keyof typeof MessageItemType];
+export type MessageItemType =
+  typeof MessageItemType[keyof typeof MessageItemType];
 export type MessageState = typeof MessageState[keyof typeof MessageState];
-export type UploadMediaType = typeof UploadMediaType[keyof typeof UploadMediaType];
+export type UploadMediaType =
+  typeof UploadMediaType[keyof typeof UploadMediaType];
 
-export type ItemType = "text" | "image" | "video" | "file" | "voice" | "unknown";
+export type ItemType =
+  | "text"
+  | "image"
+  | "video"
+  | "file"
+  | "voice"
+  | "unknown";

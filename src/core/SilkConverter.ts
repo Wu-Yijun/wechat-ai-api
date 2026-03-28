@@ -1,4 +1,3 @@
-
 /** Default sample rate for Weixin voice messages. */
 const SILK_SAMPLE_RATE = 24_000;
 
@@ -45,7 +44,6 @@ function pcmBytesToWav(pcm: Uint8Array, sampleRate: number): Buffer {
 
   return buf;
 }
-
 
 export async function silkToWav(silkBuffer: Buffer): Promise<Buffer | null> {
   try {

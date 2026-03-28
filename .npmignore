@@ -1,0 +1,9 @@
+# .npmignore
+node_modules/
+src/
+example/
+temp/
+.vscode/
+.env
+session.json
+tsconfig.json

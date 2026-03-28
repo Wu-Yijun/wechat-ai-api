@@ -1,7 +1,11 @@
 // src/managers/CdnManager.ts
 import { WeChatCore } from "../core/WeChatCore.ts";
 import { CryptoUtils } from "../core/CryptoUtils.ts";
-import type { UploadMediaType, CdnFileTicket, CdnDownloadTicket } from "../types.ts";
+import type {
+  CdnDownloadTicket,
+  CdnFileTicket,
+  UploadMediaType,
+} from "../types.ts";
 
 export class CdnManager {
   private core: WeChatCore;
@@ -26,9 +30,8 @@ export class CdnManager {
   public async uploadBuffer(
     buffer: Buffer,
     toUserId: string,
-    mediaType: UploadMediaType
+    mediaType: UploadMediaType,
   ): Promise<CdnFileTicket> {
-
     // --------------------------------------------------
     // Step 1: 准备元数据与加密密钥
     // --------------------------------------------------
@@ -44,20 +47,23 @@ export class CdnManager {
     // --------------------------------------------------
     // Step 2: 访问控制面，申请上传门票 (Upload URL)
     // --------------------------------------------------
-    const uploadUrlResp = await this.core.request<any>("ilink/bot/getuploadurl", {
-      method: "POST",
-      body: {
-        filekey,
-        media_type: mediaType,
-        to_user_id: toUserId,
-        rawsize,
-        rawfilemd5,
-        filesize,
-        no_need_thumb: true, // 📝 [待重构]: 暂时忽略缩略图逻辑，全部设为 true
-        aeskey: aeskeyHex,
+    const uploadUrlResp = await this.core.request<any>(
+      "ilink/bot/getuploadurl",
+      {
+        method: "POST",
+        body: {
+          filekey,
+          media_type: mediaType,
+          to_user_id: toUserId,
+          rawsize,
+          rawfilemd5,
+          filesize,
+          no_need_thumb: true, // 📝 [待重构]: 暂时忽略缩略图逻辑，全部设为 true
+          aeskey: aeskeyHex,
+        },
+        timeoutMs: 15_000,
       },
-      timeoutMs: 15_000,
-    });
+    );
 
     // 解析出真实的 CDN 地址
     // 微信有时候返回完整的 URL (upload_full_url)，有时候只返回 query 参数 (upload_param)
@@ -65,9 +71,13 @@ export class CdnManager {
     if (uploadUrlResp.upload_full_url?.trim()) {
       cdnUrl = uploadUrlResp.upload_full_url.trim();
     } else if (uploadUrlResp.upload_param) {
-      cdnUrl = `${this.DEFAULT_CDN_BASE_URL}/upload?encrypted_query_param=${encodeURIComponent(uploadUrlResp.upload_param)}&filekey=${encodeURIComponent(filekey)}`;
+      cdnUrl = `${this.DEFAULT_CDN_BASE_URL}/upload?encrypted_query_param=${
+        encodeURIComponent(uploadUrlResp.upload_param)
+      }&filekey=${encodeURIComponent(filekey)}`;
     } else {
-      throw new Error(`[CdnManager] 获取上传地址失败，API 响应缺少 full_url 或 upload_param`);
+      throw new Error(
+        `[CdnManager] 获取上传地址失败，API 响应缺少 full_url 或 upload_param`,
+      );
     }
 
     // --------------------------------------------------
@@ -89,10 +99,9 @@ export class CdnManager {
       aeskeyBuffer,
       fileSizePlain: rawsize,
       fileSizeCipher: filesize,
-      encryptedQueryParam
+      encryptedQueryParam,
     };
   }
-
 
   // ==========================================
   // 私有发包器：专门应对奇葩的 CDN 接口
@@ -117,24 +126,27 @@ export class CdnManager {
 
         // 1. 客户端错误 (4xx)：比如鉴权失败、参数错误，重试也没用，直接抛出
         if (res.status >= 400 && res.status < 500) {
-          const errMsg = res.headers.get("x-error-message") ?? (await res.text());
+          const errMsg = res.headers.get("x-error-message") ??
+            (await res.text());
           throw new Error(`[CdnClientError] HTTP ${res.status}: ${errMsg}`);
         }
 
         // 2. 服务端错误 (5xx)：比如网关超时，尝试重试
         if (res.status !== 200) {
-          const errMsg = res.headers.get("x-error-message") ?? `HTTP ${res.status}`;
+          const errMsg = res.headers.get("x-error-message") ??
+            `HTTP ${res.status}`;
           throw new Error(`[CdnServerError]: ${errMsg}`);
         }
 
         // 3. 成功！从 Header 中寻找那把“钥匙”
         const downloadParam = res.headers.get("x-encrypted-param");
         if (!downloadParam) {
-          throw new Error("[CdnManager] 上传成功，但响应头中缺少 x-encrypted-param");
+          throw new Error(
+            "[CdnManager] 上传成功，但响应头中缺少 x-encrypted-param",
+          );
         }
 
         return downloadParam;
-
       } catch (err: any) {
         lastError = err;
 
@@ -145,12 +157,16 @@ export class CdnManager {
 
         // 否则等待一会儿继续重试 (简易退避)
         if (attempt < MAX_RETRIES) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
         }
       }
     }
 
-    throw new Error(`[CdnManager] CDN 上传失败，已重试 ${MAX_RETRIES} 次。最后错误: ${(lastError as Error)?.message}`);
+    throw new Error(
+      `[CdnManager] CDN 上传失败，已重试 ${MAX_RETRIES} 次。最后错误: ${
+        (lastError as Error)?.message
+      }`,
+    );
   }
 
   // ==========================================
@@ -158,9 +174,9 @@ export class CdnManager {
   // ==========================================
 
   /**
-     * 唯一对内暴露的下载引擎
-     * 负责拉取字节流并根据协议规范进行解密
-     */
+   * 唯一对内暴露的下载引擎
+   * 负责拉取字节流并根据协议规范进行解密
+   */
   public async downloadBuffer(ticket: CdnDownloadTicket): Promise<Buffer> {
     // 1. 确定最终的下载 URL (优先使用 fullUrl)
     let url = "";
@@ -168,9 +184,13 @@ export class CdnManager {
       url = ticket.fullUrl;
     } else if (ticket.encryptedQueryParam) {
       // 如果没有 fullUrl，就按照规则拼接
-      url = `${this.DEFAULT_CDN_BASE_URL}/download?encrypted_query_param=${encodeURIComponent(ticket.encryptedQueryParam)}`;
+      url = `${this.DEFAULT_CDN_BASE_URL}/download?encrypted_query_param=${
+        encodeURIComponent(ticket.encryptedQueryParam)
+      }`;
     } else {
-      throw new Error("[CdnManager] 下载失败：缺少 fullUrl 和 encryptedQueryParam");
+      throw new Error(
+        "[CdnManager] 下载失败：缺少 fullUrl 和 encryptedQueryParam",
+      );
     }
 
     // 2. 发起网络请求，拉取原始的 ArrayBuffer
@@ -206,11 +226,16 @@ export class CdnManager {
     }
 
     // 如果解密出来是 32 个字符，并且全是十六进制字符，说明它被二次 Hex 编码了
-    if (decoded.length === 32 && /^[0-9a-fA-F]{32}$/i.test(decoded.toString("ascii"))) {
+    if (
+      decoded.length === 32 &&
+      /^[0-9a-fA-F]{32}$/i.test(decoded.toString("ascii"))
+    ) {
       return Buffer.from(decoded.toString("ascii"), "hex");
     }
 
-    throw new Error(`[CdnManager] 无法解析的 AES 密钥格式 (Base64="${aesKeyBase64}")`);
+    throw new Error(
+      `[CdnManager] 无法解析的 AES 密钥格式 (Base64="${aesKeyBase64}")`,
+    );
   }
 
   /**
@@ -220,7 +245,9 @@ export class CdnManager {
     const res = await fetch(url);
     if (!res.ok) {
       const body = await res.text().catch(() => "(unreadable)");
-      throw new Error(`[CdnManager] CDN 下载网络错误 HTTP ${res.status}: ${body}`);
+      throw new Error(
+        `[CdnManager] CDN 下载网络错误 HTTP ${res.status}: ${body}`,
+      );
     }
     return Buffer.from(await res.arrayBuffer());
   }

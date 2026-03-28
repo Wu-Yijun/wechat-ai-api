@@ -1,24 +1,40 @@
 {
   "name": "wechat-ai-api",
   "version": "1.0.0",
-  "description": "todo",
+  "description": "一个优雅、轻量、开箱即用的个人微信通知/机器人 SDK",
   "keywords": [
-    "todo",
-    "todo"
+    "wechat",
+    "bot",
+    "sdk",
+    "wechat-bot",
+    "api",
+    "notification"
   ],
   "repository": {
     "type": "git",
-    "url": "todo"
+    "url": "https://github.com/你的用户名/wechat-ai-api.git"
   },
   "license": "MIT",
   "author": "Aluria",
   "type": "module",
-  "main": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "clean": "rm -rf ./dist",
+    "prepare": "npm run clean && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "devDependencies": {
-    "@types/node": "^25.5.0",
+  "dependencies": {
     "silk-wasm": "^3.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   }
 }

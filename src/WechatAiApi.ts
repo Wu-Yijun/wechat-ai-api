@@ -4,7 +4,13 @@ import { writeFile } from "node:fs/promises";
 import { WeChatCore } from "./core/WeChatCore.ts";
 import { AuthManager } from "./managers/AuthManager.ts";
 import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
-import type { CdnDownloadTicket, ItemType, LoginOptions, WeChatClientConfig, WeChatIncomingMessage } from "./types.ts";
+import type {
+  CdnDownloadTicket,
+  ItemType,
+  LoginOptions,
+  WeChatClientConfig,
+  WeChatIncomingMessage,
+} from "./types.ts";
 import { MessageManager } from "./managers/MessageManager.ts";
 import { CdnManager } from "./managers/CdnManager.ts";
 import { getItemType, mergeObjects } from "./core/utils.ts";
@@ -78,7 +84,9 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
    * 启动扫码登录流程。
    * @param options 可选。如果为空，将使用默认的控制台交互体验。
    */
-  public async login(options: Partial<LoginOptions> = DEFAULT_LOGIN_OPTIONS): Promise<LoginCredentials> {
+  public async login(
+    options: Partial<LoginOptions> = DEFAULT_LOGIN_OPTIONS,
+  ): Promise<LoginCredentials> {
     // 默认的“无脑”交互实现
     const defaultOptions = mergeObjects(DEFAULT_LOGIN_OPTIONS, options);
 
@@ -190,13 +198,17 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
 
         // 1. 检查服务端返回的错误码 (容错处理：成功时字段可能被省略)
         const hasErrorRet = response.ret !== undefined && response.ret !== 0;
-        const hasErrcode = response.errcode !== undefined && response.errcode !== 0;
+        const hasErrcode = response.errcode !== undefined &&
+          response.errcode !== 0;
 
         // 1. 检查服务端返回的错误码 (例如 -14 代表登录失效)
         if (hasErrorRet || hasErrcode) {
           this.isPolling = false;
           console.log(response);
-          this.emit("error", new Error(`会话已失效或服务端报错 (errcode: ${response.errcode})`));
+          this.emit(
+            "error",
+            new Error(`会话已失效或服务端报错 (errcode: ${response.errcode})`),
+          );
           console.error(`[WeChatBot] ❌ 轮询异常中止：${response.errmsg}`);
           break;
         }
@@ -215,11 +227,10 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
             // 触发全局通用消息事件
             for (const msg of parsedMsgs) {
               this.emit("message", msg);
-              this.emit(msg.msgType, msg);
+              if (msg.msgType && msg.msgType !== "unknown") this.emit(msg.msgType, msg);
             }
           }
         }
-
       } catch (error: any) {
         // 4. 处理客户端超时 (正常现象，继续轮询)
         if (error.name === "AbortError" || error.message.includes("timeout")) {
@@ -228,8 +239,10 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
         }
 
         // 处理真实的网络异常 (断网等)，退避 3 秒后重试，防止 CPU 满载
-        console.error(`[WeChatBot] ⚠️ 轮询遇到网络异常，3秒后重试: ${error.message}`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.error(
+          `[WeChatBot] ⚠️ 轮询遇到网络异常，3秒后重试: ${error.message}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
 
@@ -272,7 +285,10 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
     for (let i = 0; i < raw.item_list.length; i++) {
       const item = raw.item_list[i];
       const itemType = getItemType(item.type);
-      const msgCopy = mergeObjects(shared_data, { index: i, msgType: itemType });
+      const msgCopy = mergeObjects(shared_data, {
+        index: i,
+        msgType: itemType,
+      });
       if (itemType !== "text" && itemType !== "unknown") {
         let cachedBuffer: Buffer | null = null;
         const ticket = this._extractDownloadTicket(item, itemType);
@@ -301,7 +317,7 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
           // fs.writeFile 写入并返回路径
           await writeFile(savePath, buf);
           return savePath;
-        }
+        };
         // 4. [核心逻辑]: 如果开启了自动下载，就在抛出事件前，在后台先下载好！
         if (this.autoDownloadMedia !== false && ticket) {
           try {
@@ -319,10 +335,14 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
   /**
    * 从原始 JSON 中提取标准化的 CDN 下载票据
    */
-  private _extractDownloadTicket(item: any, itemType: ItemType): CdnDownloadTicket | undefined {
+  private _extractDownloadTicket(
+    item: any,
+    itemType: ItemType,
+  ): CdnDownloadTicket | undefined {
     if (itemType === "text" || itemType === "unknown") return undefined; // 纯文本没有下载票
 
-    const file_item = item.image_item ?? item.file_item ?? item.video_item ?? item.voice_item;
+    const file_item = item.image_item ?? item.file_item ?? item.video_item ??
+      item.voice_item;
     if (!file_item || !file_item.media) return undefined;
     const media = file_item.media;
 
@@ -350,5 +370,4 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
       originalFileName: file_item.file_name || file_item.originalFileName,
     };
   }
-
 }

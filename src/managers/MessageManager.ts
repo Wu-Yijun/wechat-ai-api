@@ -4,7 +4,12 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { WeChatCore } from "../core/WeChatCore.ts";
 import { CdnManager } from "./CdnManager.ts";
-import { MessageItemType, MessageState, MessageType, UploadMediaType } from "../types.ts"; // 假设在 types.ts 中定义
+import {
+  MessageItemType,
+  MessageState,
+  MessageType,
+  UploadMediaType,
+} from "../types.ts"; // 假设在 types.ts 中定义
 import { mergeObjects } from "../core/utils.ts";
 
 // ==========================================
@@ -12,7 +17,7 @@ import { mergeObjects } from "../core/utils.ts";
 // ==========================================
 
 export interface SendMessageOptions {
-  /** * 上下文 Token。用于在特定的会话上下文中回复消息 
+  /** * 上下文 Token。用于在特定的会话上下文中回复消息
    */
   contextToken?: string;
   /** * 接收消息的用户 ID (微信 ID)，如果不提供，SDK 会尝试使用登录用户的 ID 作为默认值
@@ -59,34 +64,70 @@ export class MessageManager {
   // 公开 API: 发送纯文本
   // ==========================================
 
-  public async sendText(text: string, options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
+  public async sendText(
+    text: string,
+    options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS,
+  ): Promise<SendResult> {
     const textItem = {
       type: MessageItemType.TEXT,
       text_item: { text },
     };
-    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
-    return this._sendRawItem(textItem, mergedOptions.userId!, mergedOptions.contextToken);
+    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
+      userId: this.userId,
+    }, options);
+    return this._sendRawItem(
+      textItem,
+      mergedOptions.userId!,
+      mergedOptions.contextToken,
+    );
   }
 
   // ==========================================
   // 公开 API: 发送媒体文件
   // ==========================================
 
-  public async sendImage(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
-    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
-    return this._sendMediaWorkflow(filePath, UploadMediaType.IMAGE, mergedOptions);
+  public async sendImage(
+    filePath: string,
+    options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS,
+  ): Promise<SendResult> {
+    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
+      userId: this.userId,
+    }, options);
+    return this._sendMediaWorkflow(
+      filePath,
+      UploadMediaType.IMAGE,
+      mergedOptions,
+    );
   }
 
-  public async sendVideo(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
-    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
-    return this._sendMediaWorkflow(filePath, UploadMediaType.VIDEO, mergedOptions);
+  public async sendVideo(
+    filePath: string,
+    options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS,
+  ): Promise<SendResult> {
+    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
+      userId: this.userId,
+    }, options);
+    return this._sendMediaWorkflow(
+      filePath,
+      UploadMediaType.VIDEO,
+      mergedOptions,
+    );
   }
 
   /** - 仅允许发送文件, 发送**图片或视频**会导致发送失败!
-    * - 发送图片和视频应使用 `sendImage` 或 `sendVideo` */
-  public async sendFile(filePath: string, options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS): Promise<SendResult> {
-    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, { userId: this.userId }, options);
-    return this._sendMediaWorkflow(filePath, UploadMediaType.FILE, mergedOptions);
+   * - 发送图片和视频应使用 `sendImage` 或 `sendVideo` */
+  public async sendFile(
+    filePath: string,
+    options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS,
+  ): Promise<SendResult> {
+    const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
+      userId: this.userId,
+    }, options);
+    return this._sendMediaWorkflow(
+      filePath,
+      UploadMediaType.FILE,
+      mergedOptions,
+    );
   }
 
   // ==========================================
@@ -99,19 +140,24 @@ export class MessageManager {
   private async _sendMediaWorkflow(
     filePath: string,
     mediaType: UploadMediaType,
-    options: SendMediaOptions
+    options: SendMediaOptions,
   ): Promise<SendResult> {
-
     // 1. 读取本地文件为 Buffer
     const buffer = await fs.readFile(filePath);
     const fileName = path.basename(filePath);
 
     // 2. 调用 CdnManager 上传至微信服务器，获取票据
-    const ticket = await this.cdn.uploadBuffer(buffer, options.userId!, mediaType);
+    const ticket = await this.cdn.uploadBuffer(
+      buffer,
+      options.userId!,
+      mediaType,
+    );
 
     // 3. 如果用户传了 caption，先发送一条纯文本消息
     if (options.caption) {
-      await this.sendText(options.caption, { contextToken: options.contextToken });
+      await this.sendText(options.caption, {
+        contextToken: options.contextToken,
+      });
     }
 
     // 4. 组装媒体 Item 载荷
@@ -139,7 +185,11 @@ export class MessageManager {
       case UploadMediaType.FILE:
         messageItem = {
           type: MessageItemType.FILE,
-          file_item: { media: mediaObj, file_name: fileName, len: String(ticket.fileSizePlain) }, // 注意 len 是明文大小的字符串
+          file_item: {
+            media: mediaObj,
+            file_name: fileName,
+            len: String(ticket.fileSizePlain),
+          }, // 注意 len 是明文大小的字符串
         };
         break;
       default:
@@ -147,13 +197,21 @@ export class MessageManager {
     }
 
     // 5. 将组装好的媒体 Item 发送出去
-    return this._sendRawItem(messageItem, options.userId!, options.contextToken);
+    return this._sendRawItem(
+      messageItem,
+      options.userId!,
+      options.contextToken,
+    );
   }
 
   /**
    * 最底层的发包函数，将组装好的 Item 包装成完整的微信请求体并 POST
    */
-  private async _sendRawItem(itemObj: any, userId: string, contextToken?: string): Promise<SendResult> {
+  private async _sendRawItem(
+    itemObj: any,
+    userId: string,
+    contextToken?: string,
+  ): Promise<SendResult> {
     const clientId = this._generateClientId();
 
     const requestBody: any = {
@@ -165,19 +223,19 @@ export class MessageManager {
         message_state: MessageState.FINISH,
         contextToken: contextToken,
         item_list: [itemObj],
-      }
+      },
     };
 
-    const response  = await this.core.request("ilink/bot/sendmessage", {
+    const response = await this.core.request("ilink/bot/sendmessage", {
       method: "POST",
       body: requestBody,
       timeoutMs: 15000,
     });
 
-    return {clientId, response};
+    return { clientId, response };
   }
 
-  /** * 生成去重的客户端消息 ID 
+  /** * 生成去重的客户端消息 ID
    * 格式: prefix:timestamp-randomHex
    */
   private _generateClientId(): string {

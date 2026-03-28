@@ -2,7 +2,6 @@
 import { WeChatCore } from "../core/WeChatCore.ts";
 import type { LoginOptions, LoginResult, QrCodeInfo } from "../types.ts";
 
-
 export class AuthManager {
   private core: WeChatCore;
   private readonly DEFAULT_BOT_TYPE = "3";

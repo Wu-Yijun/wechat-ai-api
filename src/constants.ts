@@ -1,4 +1,4 @@
-import type { WeChatClientConfig,LoginOptions } from "./types.ts";
+import type { LoginOptions, WeChatClientConfig } from "./types.ts";
 
 export const DEFAULT_CLIENT_CONFIG: WeChatClientConfig = {
   appId: "bot",
@@ -25,7 +25,9 @@ export const DEFAULT_LOGIN_OPTIONS: LoginOptions = {
         console.log("\n👀 已扫码，请在手机微信上点击确认登录...");
         break;
       case "confirmed":
-        console.log("\n已链接, 但需手动在微信发送第一条消息后, bot 才能正常回复");
+        console.log(
+          "\n已链接, 但需手动在微信发送第一条消息后, bot 才能正常回复",
+        );
         break;
       case "scaned_but_redirect":
         console.log(`\n[系统] ${payload.message}`);
@@ -33,4 +35,3 @@ export const DEFAULT_LOGIN_OPTIONS: LoginOptions = {
     }
   },
 };
-

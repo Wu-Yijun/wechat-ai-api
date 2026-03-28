@@ -1,8 +1,7 @@
 node_modules/
 .vscode/
 .env
-
+dist/
 temp/
 
-# for example tests
 session.json

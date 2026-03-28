@@ -28,4 +28,3 @@ export function getItemType(item: number): ItemType {
       return "unknown";
   }
 }
-
