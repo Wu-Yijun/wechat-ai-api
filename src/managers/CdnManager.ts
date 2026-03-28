@@ -1,13 +1,13 @@
 // src/managers/CdnManager.ts
 import { WeChatCore } from "../core/WeChatCore.ts";
 import { CryptoUtils } from "../core/CryptoUtils.ts";
-import type { UploadMediaType, CdnFileTicket } from "../types.ts";
+import type { UploadMediaType, CdnFileTicket, CdnDownloadTicket } from "../types.ts";
 
 export class CdnManager {
   private core: WeChatCore;
-  
+
   // 📝 [待重构]: 未来这个值可以从 WeChatBotOptions 中读取
-  private readonly DEFAULT_CDN_BASE_URL = "https://cdn.weixin.qq.com"; 
+  private readonly DEFAULT_CDN_BASE_URL = "https://cdn.weixin.qq.com";
 
   constructor(core: WeChatCore) {
     this.core = core;
@@ -16,7 +16,7 @@ export class CdnManager {
   // ==========================================
   // 核心流水线：上传二进制流到 CDN
   // ==========================================
-  
+
   /**
    * 将任意 Buffer 上传至微信 CDN，并返回发送消息所需的凭证
    * @param buffer 文件的二进制原始数据
@@ -28,14 +28,14 @@ export class CdnManager {
     toUserId: string,
     mediaType: UploadMediaType
   ): Promise<CdnFileTicket> {
-    
+
     // --------------------------------------------------
     // Step 1: 准备元数据与加密密钥
     // --------------------------------------------------
     const rawsize = buffer.length;
     const rawfilemd5 = CryptoUtils.md5(buffer);
     const filesize = CryptoUtils.getPaddedSize(rawsize); // AES 加密后的对齐大小
-    
+
     // 微信要求 aeskey 和 filekey 都是 16 字节
     const filekey = CryptoUtils.generateRandomKey(16).toString("hex");
     const aeskeyBuffer = CryptoUtils.generateRandomKey(16);
@@ -112,7 +112,7 @@ export class CdnManager {
         const res = await fetch(cdnUrl, {
           method: "POST",
           headers: { "Content-Type": "application/octet-stream" },
-          body: new Uint8Array(ciphertext), 
+          body: new Uint8Array(ciphertext),
         });
 
         // 1. 客户端错误 (4xx)：比如鉴权失败、参数错误，重试也没用，直接抛出
@@ -137,12 +137,12 @@ export class CdnManager {
 
       } catch (err: any) {
         lastError = err;
-        
+
         // 如果是 4xx 错误，立刻中断循环，不进行无意义的重试
         if (err.message && err.message.includes("[CdnClientError]")) {
-          throw err; 
+          throw err;
         }
-        
+
         // 否则等待一会儿继续重试 (简易退避)
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
@@ -151,5 +151,77 @@ export class CdnManager {
     }
 
     throw new Error(`[CdnManager] CDN 上传失败，已重试 ${MAX_RETRIES} 次。最后错误: ${(lastError as Error)?.message}`);
+  }
+
+  // ==========================================
+  // 核心流水线：从 CDN 下载并解密
+  // ==========================================
+
+  /**
+     * 唯一对内暴露的下载引擎
+     * 负责拉取字节流并根据协议规范进行解密
+     */
+  public async downloadBuffer(ticket: CdnDownloadTicket): Promise<Buffer> {
+    // 1. 确定最终的下载 URL (优先使用 fullUrl)
+    let url = "";
+    if (ticket.fullUrl) {
+      url = ticket.fullUrl;
+    } else if (ticket.encryptedQueryParam) {
+      // 如果没有 fullUrl，就按照规则拼接
+      url = `${this.DEFAULT_CDN_BASE_URL}/download?encrypted_query_param=${encodeURIComponent(ticket.encryptedQueryParam)}`;
+    } else {
+      throw new Error("[CdnManager] 下载失败：缺少 fullUrl 和 encryptedQueryParam");
+    }
+
+    // 2. 发起网络请求，拉取原始的 ArrayBuffer
+    const encryptedBuffer = await this.fetchCdnBytes(url);
+
+    // 3. 明文回退：如果协议表明这是明文传输（没有密钥），直接返回
+    if (ticket.isPlain || !ticket.aesKeyBase64) {
+      return encryptedBuffer;
+    }
+
+    // 4. 解析变态的微信 AES 密钥
+    const aesKey = this.parseWechatAesKey(ticket.aesKeyBase64);
+
+    // 5. 使用密码学工具箱进行 AES-128-ECB 解密
+    return CryptoUtils.aesEcbDecrypt(encryptedBuffer, aesKey);
+  }
+
+  // ==========================================
+  // 私有辅助方法
+  // ==========================================
+
+  /**
+   * 处理微信极其不一致的密钥编码：
+   * 情况A: base64( raw 16 bytes )
+   * 情况B: base64( hex string of 16 bytes )
+   */
+  private parseWechatAesKey(aesKeyBase64: string): Buffer {
+    const decoded = Buffer.from(aesKeyBase64, "base64");
+
+    // 如果解密出来正好是 16 字节的二进制，直接用
+    if (decoded.length === 16) {
+      return decoded;
+    }
+
+    // 如果解密出来是 32 个字符，并且全是十六进制字符，说明它被二次 Hex 编码了
+    if (decoded.length === 32 && /^[0-9a-fA-F]{32}$/i.test(decoded.toString("ascii"))) {
+      return Buffer.from(decoded.toString("ascii"), "hex");
+    }
+
+    throw new Error(`[CdnManager] 无法解析的 AES 密钥格式 (Base64="${aesKeyBase64}")`);
+  }
+
+  /**
+   * 原生 fetch 拉取二进制字节流
+   */
+  private async fetchCdnBytes(url: string): Promise<Buffer> {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      throw new Error(`[CdnManager] CDN 下载网络错误 HTTP ${res.status}: ${body}`);
+    }
+    return Buffer.from(await res.arrayBuffer());
   }
 }

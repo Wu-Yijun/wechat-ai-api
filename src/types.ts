@@ -9,6 +9,8 @@ export interface WeChatClientConfig {
   baseUrl: string;
   /** 机器人的登录凭证，登录前可为空 */
   token?: string;
+  /** 收到图片/文件/视频时，是否在后台自动下载解密到内存中？默认 true */
+  autoDownloadMedia: boolean;
 }
 
 /** 核心引擎接收的请求参数 */
@@ -74,6 +76,48 @@ export interface CdnFileTicket {
   encryptedQueryParam: string;// 核心下载参数
 }
 
+/** 统一的 CDN 下载票据 (抹平了图片、文件、视频的差异) */
+export interface CdnDownloadTicket {
+  mediaType: "image" | "video" | "file" | "voice";
+  fullUrl?: string;               // 优先级 1
+  encryptedQueryParam?: string;   // 优先级 2
+  aesKeyBase64?: string;          // 密钥 (已统一转为 base64 处理好的)
+  isPlain: boolean;               // 是否是明文传输 (针对某些没有 aes_key 的图片)
+  originalFileName?: string;      // 针对文件
+}
+
+// 对外暴露的消息对象结构
+export interface WeChatIncomingMessage{
+  messageId: string;
+  seq: number;
+  fromUserId: string;
+  toUserId: string;
+  timestamp: number;
+  contextToken: string; // 回复消息时必须带上这个字段
+  msgType: ItemType;
+  /** 纯文本内容 */
+  text?: string;
+  /** 文件名 */
+  fileName?: string;
+  /**
+   * 获取媒体文件的二进制 Buffer。
+   * 如果开启了 autoDownloadMedia，此方法瞬间返回内存中的 Buffer。
+   * 如果关闭了，此方法会发起网络请求下载并解密，然后缓存。
+   */
+  getBuffer?: () => Promise<Buffer | null>;
+  /**
+   * 快捷方法：将媒体文件保存到本地磁盘。
+   * @param savePath 指定绝对或相对路径
+   */
+  saveToFile?: (savePath: string) => Promise<string>;
+  /** 原始底层票据 */
+  mediaTicket?: CdnDownloadTicket;
+  /** 消息在同一 seq 中的索引，方便开发者处理多 Item 的情况 */
+  index: number;
+  /** 原始消息载荷，给高级玩家使用 */
+  raw: any;
+}
+
 
 export const MessageType = {
   NONE: 0,
@@ -106,3 +150,5 @@ export type MessageType = typeof MessageType[keyof typeof MessageType];
 export type MessageItemType = typeof MessageItemType[keyof typeof MessageItemType];
 export type MessageState = typeof MessageState[keyof typeof MessageState];
 export type UploadMediaType = typeof UploadMediaType[keyof typeof UploadMediaType];
+
+export type ItemType = "text" | "image" | "video" | "file" | "voice" | "unknown";

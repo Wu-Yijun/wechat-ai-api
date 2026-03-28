@@ -4,6 +4,7 @@ export const DEFAULT_CLIENT_CONFIG: WeChatClientConfig = {
   appId: "bot",
   version: "2.1.1",
   baseUrl: "https://ilinkai.weixin.qq.com",
+  autoDownloadMedia: true,
 };
 
 export const DEFAULT_LOGIN_OPTIONS: LoginOptions = {

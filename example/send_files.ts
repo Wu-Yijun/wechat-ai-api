@@ -12,7 +12,7 @@ const mp4 = join(import.meta.dirname, "sample_file", "example.mp4");
 const jpg = join(import.meta.dirname, "sample_file", "example.jpg");
 
 // send file
-const ret_pdf = await bot.messages.sendFile(pdf, { caption: "[Optional] Caption text for the file." });
+const ret_pdf = await bot.messages.sendFile(pdf, { caption: "[Optional] Caption text before the file." });
 const ret_mp3 = await bot.messages.sendFile(mp3);
 const ret_mp4 = await bot.messages.sendVideo(mp4);
 const ret_jpg = await bot.messages.sendImage(jpg, { caption: "This is an image file." });
