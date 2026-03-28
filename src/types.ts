@@ -63,3 +63,46 @@ export interface LoginOptions {
   /** 单次长轮询的超时时间，默认 35000ms */
   pollTimeoutMs: number;
 }
+
+/** 内部流转的 CDN 文件凭据 (CdnManager 产出，MessageManager 消费) */
+export interface CdnFileTicket {
+  filekey: string;
+  aeskeyHex: string;          // 给 MessageManager 拼 JSON 用的 hex
+  aeskeyBuffer: Buffer;       // 未来下载解密用的 buffer
+  fileSizePlain: number;      // 明文大小
+  fileSizeCipher: number;     // 加密后大小
+  encryptedQueryParam: string;// 核心下载参数
+}
+
+
+export const MessageType = {
+  NONE: 0,
+  USER: 1,
+  BOT: 2,
+} as const;
+
+export const MessageItemType = {
+  NONE: 0,
+  TEXT: 1,
+  IMAGE: 2,
+  VOICE: 3,
+  FILE: 4,
+  VIDEO: 5,
+} as const;
+
+export const MessageState = {
+  NEW: 0,
+  GENERATING: 1,
+  FINISH: 2,
+} as const;
+
+export const UploadMediaType = {
+  IMAGE: 1,
+  VIDEO: 2,
+  FILE: 3,
+  VOICE: 4,
+} as const;
+export type MessageType = typeof MessageType[keyof typeof MessageType];
+export type MessageItemType = typeof MessageItemType[keyof typeof MessageItemType];
+export type MessageState = typeof MessageState[keyof typeof MessageState];
+export type UploadMediaType = typeof UploadMediaType[keyof typeof UploadMediaType];

@@ -30,3 +30,4 @@ export const DEFAULT_LOGIN_OPTIONS: LoginOptions = {
     }
   },
 };
+

@@ -6,6 +6,8 @@ import {
 } from "./managers/AuthManager.ts";
 import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
 import type { LoginOptions, WeChatClientConfig } from "./types.ts";
+import { MessageManager } from "./managers/MessageManager.ts";
+import { CdnManager } from "./managers/CdnManager.ts";
 
 // 导出的凭证接口，通常等于 LoginResult，但在外层改个名字语义更清晰
 export interface LoginCredentials {
@@ -18,8 +20,8 @@ export interface LoginCredentials {
 export class WeChatBot extends EventEmitter {
   public readonly core: WeChatCore;
   public readonly auth: AuthManager;
-  // 预留给未来的模块
-  // public readonly messages: MessageManager;
+  public readonly messages: MessageManager;
+  public readonly cdn: CdnManager;
 
   // 内部缓存当前的登录凭证
   private currentCredentials: LoginCredentials | null = null;
@@ -35,7 +37,8 @@ export class WeChatBot extends EventEmitter {
 
     // 挂载领域模块
     this.auth = new AuthManager(this.core);
-    // this.messages = new MessageManager(this.core);
+    this.cdn = new CdnManager(this.core);
+    this.messages = new MessageManager(this.core, this.cdn);
 
     // 如果初始化时直接传入了 token，先暂存一份不完整的凭证
     if (mergedConfig.token) {
@@ -65,6 +68,7 @@ export class WeChatBot extends EventEmitter {
 
     // 登录成功后，缓存在 Bot 实例中，方便随时导出
     this.currentCredentials = result;
+    this.messages.setUserId(result.userId);
 
     this.emit("login", this.currentCredentials); // 触发全局登录事件
     return this.currentCredentials;
