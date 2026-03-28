@@ -1,0 +1,23 @@
+{
+  "name": "wechat-ai-api",
+  "version": "1.0.0",
+  "description": "todo",
+  "keywords": [
+    "todo",
+    "todo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "todo"
+  },
+  "license": "MIT",
+  "author": "Aluria",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
+  }
+}
