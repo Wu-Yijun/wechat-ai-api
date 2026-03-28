@@ -8,7 +8,7 @@ const bot = new WeChatBot({
 });
 
 async function startBot() {
-  const credentials = await bot.auth.login({
+  const credentials = await bot.login({
     onQrCode: (qr) => {
       // 这里可以自定义二维码的展示方式，比如用第三方库生成图片，或者在 Web 页面上展示。
       console.log("\nPlease scan the QR code: ", qr.qrcodeUrl);

@@ -3,11 +3,9 @@ import { EventEmitter } from "node:events";
 import { WeChatCore } from "./core/WeChatCore.ts";
 import {
   AuthManager,
-  type LoginOptions,
-  type LoginResult,
 } from "./managers/AuthManager.ts";
-import { DEFAULT_CONFIG } from "./constants.ts";
-import type { WeChatClientConfig } from "./types.ts";
+import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
+import type { LoginOptions, WeChatClientConfig } from "./types.ts";
 
 // 导出的凭证接口，通常等于 LoginResult，但在外层改个名字语义更清晰
 export interface LoginCredentials {
@@ -26,11 +24,11 @@ export class WeChatBot extends EventEmitter {
   // 内部缓存当前的登录凭证
   private currentCredentials: LoginCredentials | null = null;
 
-  constructor(config: Partial<WeChatClientConfig> = DEFAULT_CONFIG) {
+  constructor(config: Partial<WeChatClientConfig> = DEFAULT_CLIENT_CONFIG) {
     super(); // 初始化 EventEmitter
 
     // 合并默认配置和用户配置
-    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    const mergedConfig = { ...DEFAULT_CLIENT_CONFIG, ...config };
 
     // 初始化网络底层
     this.core = new WeChatCore(mergedConfig);
@@ -58,33 +56,12 @@ export class WeChatBot extends EventEmitter {
    * 启动扫码登录流程。
    * @param options 可选。如果为空，将使用默认的控制台交互体验。
    */
-  public async login(options?: LoginOptions): Promise<LoginCredentials> {
+  public async login(options: Partial<LoginOptions> = DEFAULT_LOGIN_OPTIONS): Promise<LoginCredentials> {
     // 默认的“无脑”交互实现
-    const defaultOptions: LoginOptions = {
-      onQrCode: (qrInfo) => {
-        console.log("\n==========================================");
-        console.log("👉 请在浏览器中打开以下链接，并使用微信扫码：");
-        console.log(qrInfo.qrcodeUrl);
-        console.log("==========================================\n");
-      },
-      onStatusChange: (payload) => {
-        switch (payload.status) {
-          case "wait":
-            process.stdout.write("."); // 简易的 loading 动画
-            break;
-          case "scaned":
-            console.log("\n👀 已扫码，请在手机微信上点击确认登录...");
-            break;
-          case "scaned_but_redirect":
-          case "confirmed":
-            console.log(`\n[系统] ${payload.message}`);
-            break;
-        }
-      },
-    };
+    const defaultOptions = {...DEFAULT_LOGIN_OPTIONS, ...options};
 
     // 执行底层的登录逻辑
-    const result = await this.auth.login(options || defaultOptions);
+    const result = await this.auth.login(defaultOptions);
 
     // 登录成功后，缓存在 Bot 实例中，方便随时导出
     this.currentCredentials = result;
