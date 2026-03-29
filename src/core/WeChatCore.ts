@@ -136,5 +136,4 @@ export class WeChatCore {
 
     return headers;
   }
-
 }

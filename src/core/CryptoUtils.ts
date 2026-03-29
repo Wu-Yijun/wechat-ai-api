@@ -1,7 +1,11 @@
 // src/core/CryptoUtils.ts
 
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 
 export class CryptoUtils {
   public static md5(buffer: Buffer): string {
@@ -36,7 +40,7 @@ export class CryptoUtils {
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   }
 
-  /** 
+  /**
    * 生成去重的客户端消息 ID
    * 格式: prefix:timestamp-randomHex
    */

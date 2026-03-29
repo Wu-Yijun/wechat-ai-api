@@ -15,7 +15,6 @@ export interface WeChatClientConfig {
   userId?: string;
 }
 
-
 export interface SendMessageOptions {
   /** * 上下文 Token。用于在特定的会话上下文中回复消息
    */
@@ -29,8 +28,6 @@ export interface SendMessageOptions {
    */
   caption?: string;
 }
-
-
 
 /** 核心引擎接收的请求参数 */
 export interface CoreRequestOptions {
@@ -100,7 +97,6 @@ export interface CdnFileTicket {
 
 /** 统一的 CDN 下载票据 (抹平了图片、文件、视频的差异) */
 export interface CdnDownloadTicket {
-  mediaType: "image" | "video" | "file" | "voice";
   fullUrl?: string; // 优先级 1
   encryptedQueryParam?: string; // 优先级 2
   aesKeyBase64?: string; // 密钥 (已统一转为 base64 处理好的)
@@ -108,15 +104,26 @@ export interface CdnDownloadTicket {
   originalFileName?: string; // 针对文件
 }
 
+export type ItemTypeStr =
+  | "text"
+  | "image"
+  | "video"
+  | "file"
+  | "voice"
+  | "unknown";
+
 // 对外暴露的消息对象结构
-export interface WeChatIncomingMessage<T extends RawMessageItemBase = RawMessageItem> {
+export interface WeChatIncomingMessage<
+  T extends RawMessageItemBase = RawMessageItem,
+> {
   messageId: string;
   seq: number;
   fromUserId: string;
   toUserId: string;
   timestamp: number;
   contextToken: string; // 回复消息时必须带上这个字段
-  msgType: ItemType;
+  msgType: T["type"];
+  msgTypeStr: ItemTypeStr; // 方便使用者直接判断类型的字符串版本
   /** 纯文本内容 */
   text?: string;
   /** 文件名 */
@@ -142,142 +149,132 @@ export interface WeChatIncomingMessage<T extends RawMessageItemBase = RawMessage
   raw: RawMessage<T>;
 }
 
-export const MessageType = {
-  NONE: 0,
-  USER: 1,
-  BOT: 2,
-} as const;
+export const enum MessageType {
+  NONE = 0,
+  USER = 1,
+  BOT = 2,
+}
 
-export const MessageItemType = {
-  NONE: 0,
-  TEXT: 1,
-  IMAGE: 2,
-  VOICE: 3,
-  FILE: 4,
-  VIDEO: 5,
-} as const;
+export const enum MessageItemType {
+  NONE = 0,
+  TEXT = 1,
+  IMAGE = 2,
+  VOICE = 3,
+  FILE = 4,
+  VIDEO = 5,
+}
 
-export const MessageState = {
-  NEW: 0,
-  GENERATING: 1,
-  FINISH: 2,
-} as const;
+export const enum MessageState {
+  NEW = 0,
+  GENERATING = 1,
+  FINISH = 2,
+}
 
-export const UploadMediaType = {
-  IMAGE: 1,
-  VIDEO: 2,
-  FILE: 3,
-  VOICE: 4,
-} as const;
-export type MessageType = typeof MessageType[keyof typeof MessageType];
-export type MessageItemType =
-  typeof MessageItemType[keyof typeof MessageItemType];
-export type MessageState = typeof MessageState[keyof typeof MessageState];
-export type UploadMediaType =
-  typeof UploadMediaType[keyof typeof UploadMediaType];
-
-export type ItemType =
-  | "text"
-  | "image"
-  | "video"
-  | "file"
-  | "voice"
-  | "unknown";
-
+export const enum UploadMediaType {
+  IMAGE = 1,
+  VIDEO = 2,
+  FILE = 3,
+  VOICE = 4,
+}
 
 export interface PollingResult {
-  ret?: number | -2,
-  errcode?: number,
-  errmsg?: string,
-  get_updates_buf?: string,
-  msgs?: RawMessage[],
+  ret?: number | -2;
+  errcode?: number;
+  errmsg?: string;
+  get_updates_buf?: string;
+  msgs?: RawMessage[];
 }
 
 export interface RawMessage<T extends RawMessageItemBase = RawMessageItem> {
-  seq: number,
-  message_id: number,
-  from_user_id: string,
-  to_user_id: string,
-  client_id: string,
-  create_time_ms: number,
-  update_time_ms: number,
-  delete_time_ms: number | 0,
-  session_id: string | '',
-  group_id: string | '',
-  message_type: MessageType,
-  message_state: MessageState,
-  item_list: T[],
-  context_token: string
+  seq: number;
+  message_id: number;
+  from_user_id: string;
+  to_user_id: string;
+  client_id: string;
+  create_time_ms: number;
+  update_time_ms: number;
+  delete_time_ms: number | 0;
+  session_id: string | "";
+  group_id: string | "";
+  message_type: MessageType;
+  message_state: MessageState;
+  item_list: T[];
+  context_token: string;
 }
 
-export type RawMessageItem = RawMessageTextItem | RawMessageFileItem | RawMessageImageItem | RawMessageVideoItem | RawMessageVoiceItem;
+export type RawMessageItem =
+  | RawMessageTextItem
+  | RawMessageFileItem
+  | RawMessageImageItem
+  | RawMessageVideoItem
+  | RawMessageVoiceItem;
 
 export interface RawMessageItemBase {
-  type: MessageItemType,
-  create_time_ms: number,
-  update_time_ms: number,
-  is_completed: boolean,
+  type: MessageItemType;
+  create_time_ms: number;
+  update_time_ms: number;
+  is_completed: boolean;
 }
 
 export interface RawMessageTextItem extends RawMessageItemBase {
-  type: typeof MessageItemType.TEXT,
-  text_item: { text: string }
+  type: MessageItemType.TEXT;
+  text_item: { text: string };
 }
 
 export interface RawMessageFileItem extends RawMessageItemBase {
-  type: typeof MessageItemType.FILE,
+  type: MessageItemType.FILE;
   file_item: {
-    media: RawMessageMedia,
-    file_name: string,
-    md5: string,
-    len: string,
-  }
+    media: RawMessageMedia;
+    file_name: string;
+    md5: string;
+    len: string;
+  };
 }
 
 export interface RawMessageImageItem extends RawMessageItemBase {
-  type: typeof MessageItemType.IMAGE,
+  type: MessageItemType.IMAGE;
   image_item: {
-    url: string,
-    aeskey: string,
-    media: RawMessageMedia,
-    mid_size: number,
-    thumb_size: number,
-    thumb_height: number,
-    thumb_width: number,
-    hd_size: number,
-  }
+    url: string;
+    aeskey: string;
+    media: RawMessageMedia;
+    mid_size: number;
+    thumb_size: number;
+    thumb_height: number;
+    thumb_width: number;
+    hd_size: number;
+  };
 }
 
 export interface RawMessageVideoItem extends RawMessageItemBase {
-  type: typeof MessageItemType.VIDEO,
+  type: MessageItemType.VIDEO;
   video_item: {
-    media: RawMessageMedia,
-    video_size: number,
-    play_length: number,
-    video_md5: string,
-    thumb_media: RawMessageMedia,
-    thumb_size: number,
-    thumb_height: number,
-    thumb_width: number,
-  }
+    media: RawMessageMedia;
+    video_size: number;
+    play_length: number;
+    video_md5: string;
+    thumb_media: RawMessageMedia;
+    thumb_size: number;
+    thumb_height: number;
+    thumb_width: number;
+  };
 }
 
 export interface RawMessageVoiceItem extends RawMessageItemBase {
-  type: typeof MessageItemType.VOICE,
+  type: MessageItemType.VOICE;
   voice_item: {
-    media: RawMessageMedia,
-    encode_type: number | 4,
-    bits_per_sample: number | 16,
-    sample_rate: number | 16000,
-    playtime: number,
-    text: string | ''
-  }
+    media: RawMessageMedia;
+    encode_type: number | 4;
+    bits_per_sample: number | 16;
+    sample_rate: number | 16000;
+    playtime: number;
+    text: string | "";
+  };
 }
 
 export interface RawMessageMedia {
-  encrypt_query_param: string,
-  aes_key: string,
-  full_url: string,
+  encrypt_query_param: string;
+  aes_key: string;
+  full_url: string;
 }
 
 export interface WeChatApiEventMap {

@@ -10,9 +10,9 @@ import {
   MessageItemType,
   MessageState,
   MessageType,
-  UploadMediaType,
-  type SendResult,
   type SendMessageOptions,
+  type SendResult,
+  UploadMediaType,
 } from "../types.ts";
 import type { WeChatCore } from "../core/WeChatCore.ts";
 import type { CdnManager } from "./CdnManager.ts";
@@ -200,5 +200,4 @@ export class MessageManager {
 
     return { clientId, response };
   }
-
 }

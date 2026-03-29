@@ -1,10 +1,22 @@
 // src/managers/MessageParser.ts
 
 import type { CdnManager } from "./CdnManager.ts";
-import type { CdnDownloadTicket, ItemType, RawMessage, RawMessageItem, WeChatClientConfig, WeChatIncomingMessage } from "../types.ts";
+import {
+  type CdnDownloadTicket,
+  MessageItemType,
+  type RawMessage,
+  type RawMessageItem,
+  type WeChatClientConfig,
+  type WeChatIncomingMessage,
+} from "../types.ts";
 import { silkToWav } from "../core/SilkConverter.ts";
 import { writeFile } from "node:fs/promises";
-import { getFileImageItem, getItemType, mergeObjects } from "../core/utils.ts";
+import {
+  getFileImageItem,
+  getItemType,
+  isItemWithMedia,
+  mergeObjects,
+} from "../core/utils.ts";
 
 export class MessageParser {
   private cdn: CdnManager;
@@ -32,21 +44,22 @@ export class MessageParser {
       toUserId: raw.to_user_id,
       timestamp: raw.create_time_ms,
       contextToken: raw.context_token,
-      msgType: "unknown",
+      msgType: MessageItemType.TEXT,
+      msgTypeStr: "unknown",
       index: 0,
       raw: raw,
     };
 
     for (let i = 0; i < raw.item_list.length; i++) {
       const item = raw.item_list[i];
-      const itemType = getItemType(item.type);
       const msgCopy = mergeObjects(shared_data, {
         index: i,
-        msgType: itemType,
+        msgType: item.type,
+        msgTypeStr: getItemType(item.type),
       });
-      if (itemType !== "text" && itemType !== "unknown") {
+      if (isItemWithMedia(msgCopy.msgType)) {
         let cachedBuffer: Buffer | null = null;
-        const ticket = this._extractDownloadTicket(item, itemType);
+        const ticket = this._extractDownloadTicket(item);
         msgCopy.fileName = ticket?.originalFileName;
         msgCopy.mediaTicket = ticket;
         msgCopy.getBuffer = async () => {
@@ -56,7 +69,7 @@ export class MessageParser {
           cachedBuffer = await this.cdn.downloadBuffer(ticket);
           return cachedBuffer;
         };
-        if (itemType === "voice") {
+        if (msgCopy.msgType === MessageItemType.VOICE) {
           msgCopy.getVoiceBuffer = msgCopy.getBuffer; // 语音消息的原始 Buffer 是 SILK 编码
           let pcmCachedBuffer: Buffer | null = null;
           msgCopy.getBuffer = async () => {
@@ -88,16 +101,12 @@ export class MessageParser {
     return results;
   }
 
-
   /**
    * 从原始 JSON 中提取标准化的 CDN 下载票据
    */
   private _extractDownloadTicket(
     item: RawMessageItem,
-    itemType: ItemType,
   ): CdnDownloadTicket | undefined {
-    if (itemType === "text" || itemType === "unknown") return undefined; // 纯文本没有下载票
-
     const file_item = getFileImageItem(item);
     if (!file_item || !file_item.media) return undefined;
     const media = file_item.media;
@@ -109,7 +118,10 @@ export class MessageParser {
     let aesKeyBase64 = media.aes_key;
 
     // ⚠️ 协议特例：图片类型有时会把密钥放在外层，而且是 Hex 格式
-    if (itemType === "image" && 'aeskey' in file_item && file_item.aeskey) {
+    if (
+      item.type === MessageItemType.IMAGE && "aeskey" in file_item &&
+      file_item.aeskey
+    ) {
       // 统一转成 Base64，方便 CdnManager 统一处理
       aesKeyBase64 = Buffer.from(file_item.aeskey, "hex").toString("base64");
     }
@@ -118,12 +130,13 @@ export class MessageParser {
     const isPlain = !aesKeyBase64;
 
     return {
-      mediaType: itemType,
       fullUrl: media.full_url,
       encryptedQueryParam: media.encrypt_query_param,
       aesKeyBase64,
       isPlain,
-      originalFileName: 'file_name' in file_item ? file_item.file_name : undefined
-    }
+      originalFileName: "file_name" in file_item
+        ? file_item.file_name
+        : undefined,
+    };
   }
 }

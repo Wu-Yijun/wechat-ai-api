@@ -1,4 +1,10 @@
-import type { LoginOptions, SendMessageOptions, WeChatClientConfig } from "./types.ts";
+// src/constants.ts
+
+import type {
+  LoginOptions,
+  SendMessageOptions,
+  WeChatClientConfig,
+} from "./types.ts";
 
 export const DEFAULT_CLIENT_CONFIG: WeChatClientConfig = {
   appId: "bot",
@@ -35,7 +41,6 @@ export const DEFAULT_LOGIN_OPTIONS: LoginOptions = {
     }
   },
 };
-
 
 export const DEFAULT_SEND_OPTIONS: SendMessageOptions = {
   contextToken: undefined,

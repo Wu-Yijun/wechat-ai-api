@@ -15,8 +15,6 @@ import type {
   WeChatClientConfig,
 } from "./types.ts";
 
-
-
 export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
   public readonly core: WeChatCore;
   public readonly auth: AuthManager;
@@ -164,11 +162,14 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
     while (this.isPolling) {
       try {
         // 核心：发起长轮询请求。这里会挂起长达 35 秒，直到有新消息或超时
-        const response = await this.core.request<PollingResult>("ilink/bot/getupdates", {
-          method: "POST",
-          body: { get_updates_buf: this.syncBuf },
-          timeoutMs: 35000, // 长轮询标准超时时间
-        });
+        const response = await this.core.request<PollingResult>(
+          "ilink/bot/getupdates",
+          {
+            method: "POST",
+            body: { get_updates_buf: this.syncBuf },
+            timeoutMs: 35000, // 长轮询标准超时时间
+          },
+        );
 
         // 1. 检查服务端返回的错误码 (容错处理：成功时字段可能被省略)
         const hasErrorRet = response.ret !== undefined && response.ret !== 0;
@@ -201,7 +202,9 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
             // 触发全局通用消息事件
             for (const msg of parsedMsgs) {
               this.emit("message", msg);
-              if (msg.msgType && msg.msgType !== "unknown") this.emit(msg.msgType, msg as any);
+              if (msg.msgTypeStr !== "unknown") {
+                this.emit(msg.msgTypeStr, msg as any);
+              }
             }
           }
         }
@@ -229,5 +232,4 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
   public stopPolling() {
     this.isPolling = false;
   }
-
 }
