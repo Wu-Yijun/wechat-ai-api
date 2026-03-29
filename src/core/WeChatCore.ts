@@ -1,6 +1,7 @@
 // src/core/WeChatCore.ts
-import crypto from "node:crypto";
-import type { CoreRequestOptions, WeChatClientConfig } from "../types.js"; // 注意实际项目中的路径和后缀
+import { CryptoUtils } from "./CryptoUtils.ts";
+import { buildClientVersion } from "./utils.ts";
+import type { CoreRequestOptions, WeChatClientConfig } from "../types.ts";
 
 export class WeChatCore {
   private config: WeChatClientConfig;
@@ -9,7 +10,7 @@ export class WeChatCore {
   constructor(config: WeChatClientConfig) {
     this.config = { ...config };
     // 预计算版本号整数，避免每次发请求都算一遍
-    this.clientVersionInt = this.buildClientVersion(config.version);
+    this.clientVersionInt = buildClientVersion(config.version);
   }
 
   // ==========================================
@@ -26,9 +27,18 @@ export class WeChatCore {
     this.config.baseUrl = baseUrl;
   }
 
+  public setUserId(userId: string): void {
+    this.config.userId = userId;
+  }
+
   /** 获取当前的 BaseUrl (供某些需要拼接绝对路径的特殊场景使用) */
   public getBaseUrl(): string {
     return this.config.baseUrl;
+  }
+
+  /** 获取当前的用户 ID */
+  public getUserId(): string | undefined {
+    return this.config.userId;
   }
 
   // ==========================================
@@ -109,7 +119,7 @@ export class WeChatCore {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "AuthorizationType": "ilink_bot_token",
-      "X-WECHAT-UIN": this.randomWechatUin(),
+      "X-WECHAT-UIN": CryptoUtils.randomWechatUin(),
       "iLink-App-Id": this.config.appId,
       "iLink-App-ClientVersion": String(this.clientVersionInt),
     };
@@ -127,18 +137,4 @@ export class WeChatCore {
     return headers;
   }
 
-  /** 生成随机的 X-WECHAT-UIN (4字节随机数 -> uint32 -> base64) */
-  private randomWechatUin(): string {
-    const uint32 = crypto.randomBytes(4).readUInt32BE(0);
-    return Buffer.from(String(uint32), "utf-8").toString("base64");
-  }
-
-  /** 将 "1.0.11" 转换为 API 要求的数字位运算格式 */
-  private buildClientVersion(version: string): number {
-    const parts = version.split(".").map((p) => parseInt(p, 10));
-    const major = parts[0] || 0;
-    const minor = parts[1] || 0;
-    const patch = parts[2] || 0;
-    return ((major & 0xff) << 16) | ((minor & 0xff) << 8) | (patch & 0xff);
-  }
 }

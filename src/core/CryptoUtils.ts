@@ -1,13 +1,15 @@
 // src/core/CryptoUtils.ts
-import crypto from "node:crypto";
+
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+
 
 export class CryptoUtils {
   public static md5(buffer: Buffer): string {
-    return crypto.createHash("md5").update(buffer).digest("hex");
+    return createHash("md5").update(buffer).digest("hex");
   }
 
   public static generateRandomKey(length: number = 16): Buffer {
-    return crypto.randomBytes(length);
+    return randomBytes(length);
   }
 
   public static getPaddedSize(plaintextSize: number): number {
@@ -20,7 +22,7 @@ export class CryptoUtils {
         `[CryptoUtils] AES-128 密钥长度必须为 16 字节，当前为 ${key.length} 字节`,
       );
     }
-    const cipher = crypto.createCipheriv("aes-128-ecb", key, null);
+    const cipher = createCipheriv("aes-128-ecb", key, null);
     return Buffer.concat([cipher.update(plaintext), cipher.final()]);
   }
 
@@ -30,7 +32,22 @@ export class CryptoUtils {
         `[CryptoUtils] AES-128 密钥长度必须为 16 字节，当前为 ${key.length} 字节`,
       );
     }
-    const decipher = crypto.createDecipheriv("aes-128-ecb", key, null);
+    const decipher = createDecipheriv("aes-128-ecb", key, null);
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  }
+
+  /** 
+   * 生成去重的客户端消息 ID
+   * 格式: prefix:timestamp-randomHex
+   */
+  public static generateClientId(): string {
+    const randomHex = randomBytes(4).toString("hex");
+    return `wechat-bot:${Date.now()}-${randomHex}`;
+  }
+
+  /** 生成随机的 X-WECHAT-UIN (4字节随机数 -> uint32 -> base64) */
+  public static randomWechatUin(): string {
+    const uint32 = randomBytes(4).readUInt32BE(0);
+    return Buffer.from(String(uint32), "utf-8").toString("base64");
   }
 }

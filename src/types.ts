@@ -11,6 +11,8 @@ export interface WeChatClientConfig {
   token?: string;
   /** 收到图片/文件/视频时，是否在后台自动下载解密到内存中？默认 true */
   autoDownloadMedia: boolean;
+  /** 用户 ID */
+  userId?: string;
 }
 
 

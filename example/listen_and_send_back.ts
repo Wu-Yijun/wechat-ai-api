@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { WeChatApi } from "../src/WechatAiApi.ts";
+import { readFileSync } from "node:fs";
 import { inspect } from "node:util";
+import { WeChatApi } from "../src/WechatAiApi.ts";
 
 async function main() {
   const bot = new WeChatApi();

@@ -1,36 +1,29 @@
 // src/managers/MessageManager.ts
-import fs from "node:fs/promises";
-import path from "node:path";
-import crypto from "node:crypto";
-import { WeChatCore } from "../core/WeChatCore.ts";
-import { CdnManager } from "./CdnManager.ts";
+
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
+
 import { mergeObjects } from "../core/utils.ts";
 import { DEFAULT_SEND_OPTIONS } from "../constants.ts";
-import  {
+import { CryptoUtils } from "../core/CryptoUtils.ts";
+import {
   MessageItemType,
   MessageState,
   MessageType,
-  SendResult,
   UploadMediaType,
+  type SendResult,
   type SendMessageOptions,
 } from "../types.ts";
-
+import type { WeChatCore } from "../core/WeChatCore.ts";
+import type { CdnManager } from "./CdnManager.ts";
 
 export class MessageManager {
   private core: WeChatCore;
   private cdn: CdnManager;
-  private userId: string | undefined; // 登录后会自动设置
 
   constructor(core: WeChatCore, cdn: CdnManager) {
     this.core = core;
     this.cdn = cdn;
-  }
-
-  /** * 设置登录用户的微信 ID，供发送消息时使用
-   * 这个值通常在登录成功后由外部调用 setUserId 来设置
-   */
-  public setUserId(userId: string): void {
-    this.userId = userId;
   }
 
   // ==========================================
@@ -46,7 +39,7 @@ export class MessageManager {
       text_item: { text },
     };
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
-      userId: this.userId,
+      userId: this.core.getUserId(),
     }, options);
     return this._sendRawItem(
       textItem,
@@ -64,7 +57,7 @@ export class MessageManager {
     options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS,
   ): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
-      userId: this.userId,
+      userId: this.core.getUserId(),
     }, options);
     return this._sendMediaWorkflow(
       filePath,
@@ -78,7 +71,7 @@ export class MessageManager {
     options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS,
   ): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
-      userId: this.userId,
+      userId: this.core.getUserId(),
     }, options);
     return this._sendMediaWorkflow(
       filePath,
@@ -94,7 +87,7 @@ export class MessageManager {
     options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS,
   ): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
-      userId: this.userId,
+      userId: this.core.getUserId(),
     }, options);
     return this._sendMediaWorkflow(
       filePath,
@@ -116,8 +109,8 @@ export class MessageManager {
     options: SendMessageOptions,
   ): Promise<SendResult> {
     // 1. 读取本地文件为 Buffer
-    const buffer = await fs.readFile(filePath);
-    const fileName = path.basename(filePath);
+    const buffer = await readFile(filePath);
+    const fileName = basename(filePath);
 
     // 2. 调用 CdnManager 上传至微信服务器，获取票据
     const ticket = await this.cdn.uploadBuffer(
@@ -185,7 +178,7 @@ export class MessageManager {
     userId: string,
     contextToken?: string,
   ): Promise<SendResult> {
-    const clientId = this._generateClientId();
+    const clientId = CryptoUtils.generateClientId();
 
     const requestBody: any = {
       msg: {
@@ -208,11 +201,4 @@ export class MessageManager {
     return { clientId, response };
   }
 
-  /** * 生成去重的客户端消息 ID
-   * 格式: prefix:timestamp-randomHex
-   */
-  private _generateClientId(): string {
-    const randomHex = crypto.randomBytes(4).toString("hex");
-    return `wechat-bot:${Date.now()}-${randomHex}`;
-  }
 }

@@ -1,21 +1,18 @@
 import { EventEmitter } from "node:events";
-import { writeFile } from "node:fs/promises";
 
 import { WeChatCore } from "./core/WeChatCore.ts";
 import { AuthManager } from "./managers/AuthManager.ts";
-import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
 import { MessageManager } from "./managers/MessageManager.ts";
 import { CdnManager } from "./managers/CdnManager.ts";
-import { getItemType, mergeObjects } from "./core/utils.ts";
-import { silkToWav } from "./core/SilkConverter.ts";
+import { mergeObjects } from "./core/utils.ts";
+import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
 import type {
-  CdnDownloadTicket,
-  ItemType,
   LoginCredentials,
   LoginOptions,
   WeChatClientConfig,
   WeChatIncomingMessage,
 } from "./types.ts";
+import { MessageParser } from "./managers/MessageParser.ts";
 
 
 interface WeChatApiEventMap {
@@ -33,6 +30,7 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
   public readonly core: WeChatCore;
   public readonly auth: AuthManager;
   public readonly messages: MessageManager;
+  public readonly parser: MessageParser;
   public readonly cdn: CdnManager;
 
   // 内部缓存当前的登录凭证
@@ -40,8 +38,6 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
 
   private isPolling: boolean = false;
   private syncBuf: string = ""; // 极其重要：状态同步游标
-
-  private autoDownloadMedia: boolean;
 
   constructor(config: Partial<WeChatClientConfig> = DEFAULT_CLIENT_CONFIG) {
     super(); // 初始化 EventEmitter
@@ -56,8 +52,7 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
     this.auth = new AuthManager(this.core);
     this.cdn = new CdnManager(this.core);
     this.messages = new MessageManager(this.core, this.cdn);
-
-    this.autoDownloadMedia = mergedConfig.autoDownloadMedia ?? true;
+    this.parser = new MessageParser(this.cdn, mergedConfig);
 
     // 如果初始化时直接传入了 token，先暂存一份不完整的凭证
     if (mergedConfig.token) {
@@ -89,7 +84,6 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
 
     // 登录成功后，缓存在 Bot 实例中，方便随时导出
     this.currentCredentials = result;
-    this.messages.setUserId(result.userId);
 
     this.emit("login", this.currentCredentials); // 触发全局登录事件
     return this.currentCredentials;
@@ -121,8 +115,7 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
     // 同步给底层 HTTP 引擎
     this.core.setToken(credentials.token);
     this.core.setBaseUrl(credentials.baseUrl);
-
-    this.messages.setUserId(credentials.userId);
+    this.core.setUserId(credentials.userId);
 
     console.log(
       `[WeChatApi] 成功加载凭证 (AccountID: ${credentials.accountId})`,
@@ -211,7 +204,7 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
         // 3. 解析并分发新消息
         if (response.msgs && response.msgs.length > 0) {
           for (const rawMsg of response.msgs) {
-            const parsedMsgs = this._parseIncomingMessage(rawMsg);
+            const parsedMsgs = await this.parser.parse(rawMsg);
             if (!parsedMsgs || parsedMsgs.length === 0) continue;
 
             // 触发全局通用消息事件
@@ -246,118 +239,4 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
     this.isPolling = false;
   }
 
-  // ==========================================
-  // 消息解析器 (Message Parser)
-  // ==========================================
-
-  /**
-   * 将微信底层的复杂 JSON 扁平化为开发者友好的对象
-   */
-  private _parseIncomingMessage(raw: any): WeChatIncomingMessage[] {
-    // 过滤掉系统消息或无内容的空包
-    if (!raw.item_list || raw.item_list.length === 0) return [];
-
-    const results: WeChatIncomingMessage[] = [];
-
-    // 提取公共的信封数据
-    const shared_data: WeChatIncomingMessage = {
-      messageId: String(raw.message_id),
-      seq: raw.seq,
-      fromUserId: raw.from_user_id,
-      toUserId: raw.to_user_id,
-      timestamp: raw.create_time_ms,
-      contextToken: raw.context_token,
-      msgType: "unknown",
-      index: 0,
-      raw: raw,
-    };
-
-    for (let i = 0; i < raw.item_list.length; i++) {
-      const item = raw.item_list[i];
-      const itemType = getItemType(item.type);
-      const msgCopy = mergeObjects(shared_data, {
-        index: i,
-        msgType: itemType,
-      });
-      if (itemType !== "text" && itemType !== "unknown") {
-        let cachedBuffer: Buffer | null = null;
-        const ticket = this._extractDownloadTicket(item, itemType);
-        msgCopy.mediaTicket = ticket;
-        msgCopy.getBuffer = async () => {
-          if (cachedBuffer) return cachedBuffer;
-          if (!ticket) return null;
-          // 调用 CDN 管理器下载
-          cachedBuffer = await this.cdn.downloadBuffer(ticket);
-          return cachedBuffer;
-        };
-        if (itemType === "voice") {
-          msgCopy.getVoiceBuffer = msgCopy.getBuffer; // 语音消息的原始 Buffer 是 SILK 编码
-          let pcmCachedBuffer: Buffer | null = null;
-          msgCopy.getBuffer = async () => {
-            if (pcmCachedBuffer) return pcmCachedBuffer;
-            const silk_buffer = await msgCopy.getVoiceBuffer!();
-            if (!silk_buffer) return null;
-            pcmCachedBuffer = await silkToWav(silk_buffer);
-            return pcmCachedBuffer;
-          };
-        }
-        msgCopy.saveToFile = async (savePath: string) => {
-          const buf = await msgCopy.getBuffer!();
-          if (!buf) throw new Error("无媒体内容可保存");
-          // fs.writeFile 写入并返回路径
-          await writeFile(savePath, buf);
-          return savePath;
-        };
-        // 4. [核心逻辑]: 如果开启了自动下载，就在抛出事件前，在后台先下载好！
-        if (this.autoDownloadMedia !== false && ticket) {
-          try {
-            msgCopy.getBuffer(); // 不 await，后台下载，事件照常触发
-          } catch (err: any) {
-            console.error(`自动下载媒体失败: ${err.message}`);
-          }
-        }
-      }
-      results.push(msgCopy);
-    }
-    return results;
-  }
-
-  /**
-   * 从原始 JSON 中提取标准化的 CDN 下载票据
-   */
-  private _extractDownloadTicket(
-    item: any,
-    itemType: ItemType,
-  ): CdnDownloadTicket | undefined {
-    if (itemType === "text" || itemType === "unknown") return undefined; // 纯文本没有下载票
-
-    const file_item = item.image_item ?? item.file_item ?? item.video_item ??
-      item.voice_item;
-    if (!file_item || !file_item.media) return undefined;
-    const media = file_item.media;
-
-    // 如果连基本的下载参数都没有，直接放弃
-    if (!media.encrypt_query_param && !media.full_url) return undefined;
-
-    // 2. 抹平 AES 密钥的特权差异
-    let aesKeyBase64 = media.aes_key;
-
-    // ⚠️ 协议特例：图片类型有时会把密钥放在外层，而且是 Hex 格式
-    if (itemType === "image" && file_item.aeskey) {
-      // 统一转成 Base64，方便 CdnManager 统一处理
-      aesKeyBase64 = Buffer.from(file_item.aeskey, "hex").toString("base64");
-    }
-
-    // 3. 判断是否为明文传输 (某些情况下微信图片没有 aes_key)
-    const isPlain = !aesKeyBase64;
-
-    return {
-      mediaType: itemType,
-      fullUrl: media.full_url,
-      encryptedQueryParam: media.encrypt_query_param,
-      aesKeyBase64,
-      isPlain,
-      originalFileName: file_item.file_name || file_item.originalFileName,
-    };
-  }
 }

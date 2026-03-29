@@ -1,3 +1,5 @@
+// // src/core/SilkConverter.ts
+
 /** Default sample rate for Weixin voice messages. */
 const SILK_SAMPLE_RATE = 24_000;
 

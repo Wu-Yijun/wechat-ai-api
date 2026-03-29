@@ -112,6 +112,7 @@ export class AuthManager {
 
             // 关键：自动将获取到的凭据注入到底层引擎中
             this.core.setToken(data.bot_token);
+            this.core.setUserId(data.ilink_user_id)
             if (data.baseurl) {
               this.core.setBaseUrl(data.baseurl);
             }
