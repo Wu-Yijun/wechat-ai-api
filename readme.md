@@ -4,7 +4,7 @@
 
 ## ✨ 特性
 
-- 🚀 **极致精简**：`bot = new WeChatBot(); bot.login();` 即可扫码启动。
+- 🚀 **极致精简**：`bot = new WeChatApi(); bot.login();` 即可扫码启动。
 - 📦 **实例隔离**：无需传入繁琐的 AccountID，发消息默认路由给扫码管理员。
 - 🖼️ **媒体全自动**：发送图片/文件自动完成 AES-128 加密与 CDN 上传；收到文件自动静默下载解密。
 - 🎧 **语音支持**：内置微信特有 SILK 格式的处理逻辑。
@@ -21,11 +21,11 @@ npm install @aluria/wechat-ai-api
 以下是一个最简单的“鹦鹉学舌”机器人示例：
 
 ```typescript
-import { WeChatBot } from "@aluria/wechat-ai-api";
+import { WeChatApi } from "@aluria/wechat-ai-api";
 import fs from "fs";
 
 async function main() {
-  const bot = new WeChatBot();
+  const bot = new WeChatApi();
 
   // 1. 尝试从本地加载凭证（实现免扫码重启）
   if (fs.existsSync("./session.json")) {
@@ -60,11 +60,11 @@ main();
 
 ## 📖 API 概览
 
-### 发送消息 (`bot.messages`)
-- `bot.messages.sendText(text, options?)`
-- `bot.messages.sendImage(filePath, options?)`
-- `bot.messages.sendVideo(filePath, options?)`
-- `bot.messages.sendFile(filePath, options?)`
+### 发送消息 (`WeChatApi.messages`)
+- `WeChatApi.messages.sendText(text, options?)`
+- `WeChatApi.messages.sendImage(filePath, options?)`
+- `WeChatApi.messages.sendVideo(filePath, options?)`
+- `WeChatApi.messages.sendFile(filePath, options?)`
 
 ### 示例代码
 

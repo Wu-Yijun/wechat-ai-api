@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { WeChatBot } from "../src/WechatAiApi.ts";
+import { WeChatApi } from "../src/WechatAiApi.ts";
 import { join } from "node:path";
 
-const bot = new WeChatBot();
+const bot = new WeChatApi();
 const credentials = JSON.parse(readFileSync("./session.json", "utf-8"));
 bot.loadCredentials(credentials);
 

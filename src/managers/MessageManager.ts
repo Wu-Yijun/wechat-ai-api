@@ -4,44 +4,17 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { WeChatCore } from "../core/WeChatCore.ts";
 import { CdnManager } from "./CdnManager.ts";
-import {
+import { mergeObjects } from "../core/utils.ts";
+import { DEFAULT_SEND_OPTIONS } from "../constants.ts";
+import  {
   MessageItemType,
   MessageState,
   MessageType,
+  SendResult,
   UploadMediaType,
-} from "../types.ts"; // 假设在 types.ts 中定义
-import { mergeObjects } from "../core/utils.ts";
+  type SendMessageOptions,
+} from "../types.ts";
 
-// ==========================================
-// 接口定义
-// ==========================================
-
-export interface SendMessageOptions {
-  /** * 上下文 Token。用于在特定的会话上下文中回复消息
-   */
-  contextToken?: string;
-  /** * 接收消息的用户 ID (微信 ID)，如果不提供，SDK 会尝试使用登录用户的 ID 作为默认值
-   */
-  userId?: string;
-}
-
-const DEFAULT_SEND_OPTIONS: SendMessageOptions = {
-  contextToken: undefined,
-  userId: undefined,
-};
-
-export interface SendMediaOptions extends SendMessageOptions {
-  /** * 媒体附件的文字说明。
-   * 注意：微信不支持图文混合在同一个 Item 中，
-   * 如果提供此参数，SDK 会先发送一条文本消息，紧接着发送媒体消息。
-   */
-  caption?: string;
-}
-
-interface SendResult {
-  clientId: string;
-  response: any; // 微信服务器的原始响应，未来可以根据需要定义更具体的类型
-}
 
 export class MessageManager {
   private core: WeChatCore;
@@ -88,7 +61,7 @@ export class MessageManager {
 
   public async sendImage(
     filePath: string,
-    options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS,
+    options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS,
   ): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
       userId: this.userId,
@@ -102,7 +75,7 @@ export class MessageManager {
 
   public async sendVideo(
     filePath: string,
-    options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS,
+    options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS,
   ): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
       userId: this.userId,
@@ -118,7 +91,7 @@ export class MessageManager {
    * - 发送图片和视频应使用 `sendImage` 或 `sendVideo` */
   public async sendFile(
     filePath: string,
-    options: Partial<SendMediaOptions> = DEFAULT_SEND_OPTIONS,
+    options: Partial<SendMessageOptions> = DEFAULT_SEND_OPTIONS,
   ): Promise<SendResult> {
     const mergedOptions = mergeObjects(DEFAULT_SEND_OPTIONS, {
       userId: this.userId,
@@ -140,7 +113,7 @@ export class MessageManager {
   private async _sendMediaWorkflow(
     filePath: string,
     mediaType: UploadMediaType,
-    options: SendMediaOptions,
+    options: SendMessageOptions,
   ): Promise<SendResult> {
     // 1. 读取本地文件为 Buffer
     const buffer = await fs.readFile(filePath);

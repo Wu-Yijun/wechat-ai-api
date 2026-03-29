@@ -13,6 +13,23 @@ export interface WeChatClientConfig {
   autoDownloadMedia: boolean;
 }
 
+
+export interface SendMessageOptions {
+  /** * 上下文 Token。用于在特定的会话上下文中回复消息
+   */
+  contextToken?: string;
+  /** * 接收消息的用户 ID (微信 ID)，目前仅对自身账号有效，如果不提供，SDK 会尝试使用登录用户的 ID 作为默认值
+   */
+  userId?: string;
+  /** * 媒体附件的文字说明。
+   * 注意：微信不支持图文混合在同一个 Item 中，
+   * 如果提供此参数，SDK 会先发送一条文本消息，紧接着发送媒体消息。
+   */
+  caption?: string;
+}
+
+
+
 /** 核心引擎接收的请求参数 */
 export interface CoreRequestOptions {
   method: "GET" | "POST";
@@ -27,7 +44,7 @@ export interface QrCodeInfo {
   qrcodeUrl: string; // 用于生成图片的原始字符串/链接
 }
 
-export interface LoginResult {
+export interface LoginCredentials {
   token: string;
   baseUrl: string;
   accountId: string;
@@ -62,6 +79,11 @@ export interface LoginOptions {
   maxRetries: number;
   /** 单次长轮询的超时时间，默认 35000ms */
   pollTimeoutMs: number;
+}
+
+export interface SendResult {
+  clientId: string;
+  response: any;
 }
 
 /** 内部流转的 CDN 文件凭据 (CdnManager 产出，MessageManager 消费) */

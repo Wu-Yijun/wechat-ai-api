@@ -1,6 +1,6 @@
 // src/managers/AuthManager.ts
 import { WeChatCore } from "../core/WeChatCore.ts";
-import type { LoginOptions, LoginResult, QrCodeInfo } from "../types.ts";
+import type { LoginCredentials, LoginOptions, QrCodeInfo } from "../types.ts";
 
 export class AuthManager {
   private core: WeChatCore;
@@ -54,7 +54,7 @@ export class AuthManager {
   // ==========================================
   // 粗粒度 API: 一键自动托管登录
   // ==========================================
-  public async login(options: LoginOptions): Promise<LoginResult> {
+  public async login(options: LoginOptions): Promise<LoginCredentials> {
     const maxRetries = options.maxRetries ?? 3;
     let currentRetry = 0;
 

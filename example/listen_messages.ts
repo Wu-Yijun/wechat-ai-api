@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
-import { WeChatBot } from "../src/WechatAiApi.ts";
+import { WeChatApi } from "../src/WechatAiApi.ts";
 import { inspect } from "node:util";
 
 async function main() {
-  const bot = new WeChatBot();
+  const bot = new WeChatApi();
   const credentials = JSON.parse(readFileSync("./session.json", "utf-8"));
   bot.loadCredentials(credentials);
   // await bot.login(); 

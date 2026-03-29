@@ -10,7 +10,7 @@ import type {
 export class CdnManager {
   private core: WeChatCore;
 
-  // 📝 [待重构]: 未来这个值可以从 WeChatBotOptions 中读取
+  // 📝 [待重构]: 未来这个值可以从 WeChatApiOptions 中读取
   private readonly DEFAULT_CDN_BASE_URL = "https://cdn.weixin.qq.com";
 
   constructor(core: WeChatCore) {

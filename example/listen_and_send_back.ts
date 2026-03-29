@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { WeChatBot } from "../src/WechatAiApi.ts";
+import { WeChatApi } from "../src/WechatAiApi.ts";
 import { inspect } from "node:util";
 
 async function main() {
-  const bot = new WeChatBot();
+  const bot = new WeChatApi();
   const credentials = JSON.parse(readFileSync("./session.json", "utf-8"));
   bot.loadCredentials(credentials);
 
@@ -12,7 +12,7 @@ async function main() {
   // writeFileSync("./session.json", JSON.stringify(newCredentials)); 
 
   // 也可以在登录时提供回调函数，实时更新凭证
-  // const bot = new WeChatBot({
+  // const bot = new WeChatApi({
   //   appId: "bot",
   //   version: "2.1.1",
   //   baseUrl: "https://ilinkai.weixin.qq.com",

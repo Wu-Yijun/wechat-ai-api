@@ -1,7 +1,7 @@
 import fs from "node:fs";
-import { WeChatBot } from "../src/WechatAiApi.ts";
+import { WeChatApi } from "../src/WechatAiApi.ts";
 
-const bot = new WeChatBot({
+const bot = new WeChatApi({
   appId: "bot",
   version: "2.1.1",
   baseUrl: "https://ilinkai.weixin.qq.com",

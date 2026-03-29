@@ -4,27 +4,21 @@ import { writeFile } from "node:fs/promises";
 import { WeChatCore } from "./core/WeChatCore.ts";
 import { AuthManager } from "./managers/AuthManager.ts";
 import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
-import type {
-  CdnDownloadTicket,
-  ItemType,
-  LoginOptions,
-  WeChatClientConfig,
-  WeChatIncomingMessage,
-} from "./types.ts";
 import { MessageManager } from "./managers/MessageManager.ts";
 import { CdnManager } from "./managers/CdnManager.ts";
 import { getItemType, mergeObjects } from "./core/utils.ts";
 import { silkToWav } from "./core/SilkConverter.ts";
+import type {
+  CdnDownloadTicket,
+  ItemType,
+  LoginCredentials,
+  LoginOptions,
+  WeChatClientConfig,
+  WeChatIncomingMessage,
+} from "./types.ts";
 
-// 导出的凭证接口，通常等于 LoginResult，但在外层改个名字语义更清晰
-export interface LoginCredentials {
-  token: string;
-  baseUrl: string;
-  accountId: string;
-  userId: string;
-}
 
-interface WeChatBotEventMap {
+interface WeChatApiEventMap {
   login: [credentials: LoginCredentials];
   message: [msg: WeChatIncomingMessage];
   text: [msg: WeChatIncomingMessage];
@@ -35,7 +29,7 @@ interface WeChatBotEventMap {
   error: [error: Error];
 }
 
-export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
+export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
   public readonly core: WeChatCore;
   public readonly auth: AuthManager;
   public readonly messages: MessageManager;
@@ -101,10 +95,6 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
     return this.currentCredentials;
   }
 
-  public async sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   // ==========================================
   // 2. 凭证管理模块 (导入 / 导出 / 验证)
   // ==========================================
@@ -135,7 +125,7 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
     this.messages.setUserId(credentials.userId);
 
     console.log(
-      `[WeChatBot] 成功加载凭证 (AccountID: ${credentials.accountId})`,
+      `[WeChatApi] 成功加载凭证 (AccountID: ${credentials.accountId})`,
     );
   }
 
@@ -156,13 +146,13 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
       // 如果返回错误码 (如 errcode === -14 或 HTTP 401)，则认为凭证失效。
 
       console.log(
-        "[WeChatBot] 正在验证凭证有效性... (此接口逻辑待具体 API 完善)",
+        "[WeChatApi] 正在验证凭证有效性... (此接口逻辑待具体 API 完善)",
       );
 
       // 假设当前永远返回 true
       return true;
     } catch (error) {
-      console.error("[WeChatBot] 凭证验证失败，可能已过期:", error);
+      console.error("[WeChatApi] 凭证验证失败，可能已过期:", error);
       return false;
     }
   }
@@ -176,16 +166,16 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
    */
   public async startPolling() {
     if (this.isPolling) {
-      console.warn("[WeChatBot] 轮询已经在运行中，请勿重复启动");
+      console.warn("[WeChatApi] 轮询已经在运行中，请勿重复启动");
       return;
     }
 
     if (!this.currentCredentials?.token) {
-      throw new Error("[WeChatBot] 无法启动轮询：尚未登录或未加载凭证");
+      throw new Error("[WeChatApi] 无法启动轮询：尚未登录或未加载凭证");
     }
 
     this.isPolling = true;
-    console.log("[WeChatBot] 🚀 轮询守护进程已启动，正在监听新消息...");
+    console.log("[WeChatApi] 🚀 轮询守护进程已启动，正在监听新消息...");
 
     while (this.isPolling) {
       try {
@@ -209,7 +199,7 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
             "error",
             new Error(`会话已失效或服务端报错 (errcode: ${response.errcode})`),
           );
-          console.error(`[WeChatBot] ❌ 轮询异常中止：${response.errmsg}`);
+          console.error(`[WeChatApi] ❌ 轮询异常中止：${response.errmsg}`);
           break;
         }
 
@@ -240,13 +230,13 @@ export class WeChatBot extends EventEmitter<WeChatBotEventMap> {
 
         // 处理真实的网络异常 (断网等)，退避 3 秒后重试，防止 CPU 满载
         console.error(
-          `[WeChatBot] ⚠️ 轮询遇到网络异常，3秒后重试: ${error.message}`,
+          `[WeChatApi] ⚠️ 轮询遇到网络异常，3秒后重试: ${error.message}`,
         );
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
 
-    console.log("[WeChatBot] 🛑 轮询守护进程已停止。");
+    console.log("[WeChatApi] 🛑 轮询守护进程已停止。");
   }
 
   /**

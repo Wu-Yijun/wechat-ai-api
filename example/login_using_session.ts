@@ -1,7 +1,7 @@
 import fs from "node:fs";
-import { WeChatBot } from "../src/WechatAiApi.ts";
+import { WeChatApi } from "../src/WechatAiApi.ts";
 
-const bot = new WeChatBot();
+const bot = new WeChatApi();
 
 async function startBot() {
   // 1. 尝试从本地文件加载凭证
