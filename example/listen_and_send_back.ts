@@ -16,6 +16,9 @@ async function main() {
     // 本地加载
     const credentials = JSON.parse(readFileSync("./session.json", "utf-8"));
     bot.loadCredentials(credentials);
+    if(!await bot.verifyCredentials()){
+      throw new Error("凭证无效");
+    }
   } catch (_) {
     // 重新登录获取新的凭证
     const newCredentials = await bot.login();

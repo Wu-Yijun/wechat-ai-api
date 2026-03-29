@@ -136,12 +136,18 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
         timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
       });
 
-      // 只要 ret 不报错，就说明 Token 有效
       if (response.ret !== undefined && response.ret !== 0) {
         console.warn(
           `[WeChatApi] 凭证已失效 (Server returned: ${
             response.errcode || response.ret
           })`,
+        );
+        return false;
+      }
+
+      if (response.errcode !== undefined && response.errcode !== 0) {
+        console.warn(
+          `[WeChatApi] 凭证已失效 (Server returned errcode: ${response.errcode}): ${response.errmsg}`,
         );
         return false;
       }

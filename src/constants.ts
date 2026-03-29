@@ -1,14 +1,16 @@
 // src/constants.ts
 
-import {
+import type {
   CdnManagerConfig,
-  type LoginOptions,
-  LoginStatus,
-  type SendMessageOptions,
-  type WeChatClientConfig,
+  LoginOptions,
+  SendMessageOptions,
+  WeChatClientConfig,
 } from "./types.ts";
 
 // ====== Universal Constants ======
+
+export const WECHAT_DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com";
+export const WECHAT_DEFAULT_CDN_URL = "https://cdn.weixin.qq.com";
 
 // 获取二维码的普通 HTTP 请求超时 (10秒)
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
@@ -57,14 +59,14 @@ export const WECHAT_PROTOCOL = {
 export const DEFAULT_CLIENT_CONFIG: WeChatClientConfig = {
   appId: "bot",
   version: "2.1.1",
-  baseUrl: "https://ilinkai.weixin.qq.com",
-  bot_type: "3",
+  baseUrl: WECHAT_DEFAULT_BASE_URL,
+  botType: "3",
   autoDownloadMedia: true,
 };
 
 export const DEFAULT_CDN_CONFIG: CdnManagerConfig = {
   maxRetry: 3,
-  cdnBaseUrl: "https://cdn.weixin.qq.com",
+  cdnBaseUrl: WECHAT_DEFAULT_CDN_URL,
   apiTimeoutMs: DEFAULT_API_TIMEOUT_MS,
   backoffBaseMs: BACKOFF_BASE_MS,
 };
@@ -80,18 +82,18 @@ export const DEFAULT_LOGIN_OPTIONS: LoginOptions = {
   },
   onStatusChange: (payload) => {
     switch (payload.status) {
-      case LoginStatus.WAIT:
-        process.stdout.write("."); // 简易的 loading 动画
+      case "wait":
+        console.log("等待登录..."); // 简易的 loading 动画
         break;
-      case LoginStatus.SCANNED:
+      case "scaned":
         console.log("\n👀 已扫码，请在手机微信上点击确认登录...");
         break;
-      case LoginStatus.CONFIRMED:
+      case "confirmed":
         console.log(
           "\n已链接, 但需手动在微信发送第一条消息后, bot 才能正常回复",
         );
         break;
-      case LoginStatus.REDIRECT:
+      case "scaned_but_redirect":
         console.log(`\n[系统] ${payload.message}`);
         break;
     }

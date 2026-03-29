@@ -43,7 +43,7 @@ export class WeChatCore {
 
   /** 获取当前的机器人类型 */
   public getBotType(): string {
-    return this.config.bot_type;
+    return this.config.botType;
   }
 
   /** 获取当前的用户 ID */

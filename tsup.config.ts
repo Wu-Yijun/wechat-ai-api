@@ -7,5 +7,5 @@ export default defineConfig({
   splitting: false,        // 关闭代码分割
   sourcemap: true,         // 生成 sourcemap，方便使用者调试报错位置
   clean: true,             // 每次打包前自动清理 dist 目录
-  minify: true,           // 作为一个 Node 库，不压缩代码方便别人阅读源码
+  minify: false,           // 作为一个 Node 库，不压缩代码方便别人阅读源码
 });

@@ -1,6 +1,6 @@
 {
-  "name": "wechat-ai-api",
-  "version": "1.0.0",
+  "name": "@aluria/wechat-ai-api",
+  "version": "1.0.1",
   "description": "一个优雅、轻量、开箱即用的个人微信通知/机器人 SDK",
   "keywords": [
     "wechat",
@@ -12,7 +12,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/你的用户名/wechat-ai-api.git"
+    "url": "https://github.com/Wu-Yijun/wechat-ai-api.git"
   },
   "license": "MIT",
   "author": "Aluria",

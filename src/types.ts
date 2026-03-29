@@ -8,7 +8,7 @@ export interface WeChatClientConfig {
   /** 基础 API 地址，通常为 https://ilinkai.weixin.qq.com */
   baseUrl: string;
   /** 默认机器人类型, 为 "3" */
-  bot_type: string;
+  botType: string;
   /** 机器人的登录凭证，登录前可为空 */
   token?: string;
   /** 收到图片/文件/视频时，是否在后台自动下载解密到内存中？默认 true */
