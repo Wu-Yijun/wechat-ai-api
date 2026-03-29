@@ -1,7 +1,6 @@
-// // src/core/SilkConverter.ts
+// src/core/SilkConverter.ts
 
-/** Default sample rate for Weixin voice messages. */
-const SILK_SAMPLE_RATE = 24_000;
+import { WECHAT_SILK_SAMPLE_RATE } from "../constants.ts";
 
 /**
  * Wrap raw pcm_s16le bytes in a WAV container.
@@ -47,11 +46,14 @@ function pcmBytesToWav(pcm: Uint8Array, sampleRate: number): Buffer {
   return buf;
 }
 
-export async function silkToWav(silkBuffer: Buffer): Promise<Buffer | null> {
+export async function silkToWav(
+  silkBuffer: Buffer,
+  sampleRate: number = WECHAT_SILK_SAMPLE_RATE,
+): Promise<Buffer | null> {
   try {
     const { decode } = await import("silk-wasm");
-    const result = await decode(silkBuffer, SILK_SAMPLE_RATE);
-    const wav = pcmBytesToWav(result.data, SILK_SAMPLE_RATE);
+    const result = await decode(silkBuffer, sampleRate);
+    const wav = pcmBytesToWav(result.data, sampleRate);
     return wav;
   } catch (err) {
     return null;

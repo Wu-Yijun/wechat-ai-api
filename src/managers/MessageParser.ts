@@ -57,43 +57,54 @@ export class MessageParser {
         msgType: item.type,
         msgTypeStr: getItemType(item.type),
       });
-      if (isItemWithMedia(msgCopy.msgType)) {
-        let cachedBuffer: Buffer | null = null;
-        const ticket = this._extractDownloadTicket(item);
-        msgCopy.fileName = ticket?.originalFileName;
-        msgCopy.mediaTicket = ticket;
+
+      // 1. 先处理文本消息，提取纯文本内容
+      if (item.type === MessageItemType.TEXT) {
+        msgCopy.text = item.text_item.text;
+      }
+      if (!isItemWithMedia(item.type)) {
+        results.push(msgCopy);
+        continue; // 如果不是媒体消息，直接进入下一轮循环
+      }
+
+      // 2. 媒体消息需要提取下载票据，并提供 getBuffer 方法
+      let cachedBuffer: Buffer | null = null;
+      const ticket = this._extractDownloadTicket(item);
+      msgCopy.fileName = ticket?.originalFileName;
+      msgCopy.mediaTicket = ticket;
+      msgCopy.getBuffer = async () => {
+        if (cachedBuffer) return cachedBuffer;
+        if (!ticket) return null;
+        // 调用 CDN 管理器下载
+        cachedBuffer = await this.cdn.downloadBuffer(ticket);
+        return cachedBuffer;
+      };
+      msgCopy.saveToFile = async (savePath: string) => {
+        const buf = await msgCopy.getBuffer!();
+        if (!buf) throw new Error("无媒体内容可保存");
+        await writeFile(savePath, buf);
+        return savePath;
+      };
+
+      // 3. 语音消息需要特殊处理，提供一个额外的方法获取原始 SILK 编码的 Buffer
+      if (msgCopy.msgType === MessageItemType.VOICE) {
+        msgCopy.getVoiceBuffer = msgCopy.getBuffer; // 语音消息的原始 Buffer 是 SILK 编码
+        let pcmCachedBuffer: Buffer | null = null;
         msgCopy.getBuffer = async () => {
-          if (cachedBuffer) return cachedBuffer;
-          if (!ticket) return null;
-          // 调用 CDN 管理器下载
-          cachedBuffer = await this.cdn.downloadBuffer(ticket);
-          return cachedBuffer;
+          if (pcmCachedBuffer) return pcmCachedBuffer;
+          const silk_buffer = await msgCopy.getVoiceBuffer!();
+          if (!silk_buffer) return null;
+          pcmCachedBuffer = await silkToWav(silk_buffer);
+          return pcmCachedBuffer;
         };
-        if (msgCopy.msgType === MessageItemType.VOICE) {
-          msgCopy.getVoiceBuffer = msgCopy.getBuffer; // 语音消息的原始 Buffer 是 SILK 编码
-          let pcmCachedBuffer: Buffer | null = null;
-          msgCopy.getBuffer = async () => {
-            if (pcmCachedBuffer) return pcmCachedBuffer;
-            const silk_buffer = await msgCopy.getVoiceBuffer!();
-            if (!silk_buffer) return null;
-            pcmCachedBuffer = await silkToWav(silk_buffer);
-            return pcmCachedBuffer;
-          };
-        }
-        msgCopy.saveToFile = async (savePath: string) => {
-          const buf = await msgCopy.getBuffer!();
-          if (!buf) throw new Error("无媒体内容可保存");
-          // fs.writeFile 写入并返回路径
-          await writeFile(savePath, buf);
-          return savePath;
-        };
-        // 4. [核心逻辑]: 如果开启了自动下载，就在抛出事件前，在后台先下载好！
-        if (this.config.autoDownloadMedia !== false && ticket) {
-          try {
-            msgCopy.getBuffer(); // 不 await，后台下载，事件照常触发
-          } catch (err: any) {
-            console.error(`自动下载媒体失败: ${err.message}`);
-          }
+      }
+
+      // 4. 如果开启了自动下载，就在抛出事件前，在后台先下载好！
+      if (this.config.autoDownloadMedia !== false && ticket) {
+        try {
+          msgCopy.getBuffer(); // 不 await，后台下载，事件照常触发
+        } catch (err: any) {
+          console.error(`自动下载媒体失败: ${err.message}`);
         }
       }
       results.push(msgCopy);

@@ -1,14 +1,19 @@
 // src/core/WeChatCore.ts
 import { CryptoUtils } from "./CryptoUtils.ts";
-import { buildClientVersion } from "./utils.ts";
+import { buildClientVersion, mergeObjects } from "./utils.ts";
 import type { CoreRequestOptions, WeChatClientConfig } from "../types.ts";
+import {
+  DEFAULT_CLIENT_CONFIG,
+  WECHAT_HTTP_HEADERS,
+  WECHAT_PROTOCOL,
+} from "../constants.ts";
 
 export class WeChatCore {
   private config: WeChatClientConfig;
   private clientVersionInt: number;
 
   constructor(config: WeChatClientConfig) {
-    this.config = { ...config };
+    this.config = mergeObjects(DEFAULT_CLIENT_CONFIG, config);
     // 预计算版本号整数，避免每次发请求都算一遍
     this.clientVersionInt = buildClientVersion(config.version);
   }
@@ -34,6 +39,11 @@ export class WeChatCore {
   /** 获取当前的 BaseUrl (供某些需要拼接绝对路径的特殊场景使用) */
   public getBaseUrl(): string {
     return this.config.baseUrl;
+  }
+
+  /** 获取当前的机器人类型 */
+  public getBotType(): string {
+    return this.config.bot_type;
   }
 
   /** 获取当前的用户 ID */
@@ -117,11 +127,11 @@ export class WeChatCore {
   /** 构造标准请求头 */
   private buildHeaders(bodyString?: string): Record<string, string> {
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "AuthorizationType": "ilink_bot_token",
-      "X-WECHAT-UIN": CryptoUtils.randomWechatUin(),
-      "iLink-App-Id": this.config.appId,
-      "iLink-App-ClientVersion": String(this.clientVersionInt),
+      [WECHAT_HTTP_HEADERS.CONTENT_TYPE]: WECHAT_PROTOCOL.CONTENT_TYPE_JSON,
+      [WECHAT_HTTP_HEADERS.AUTH_TYPE]: WECHAT_PROTOCOL.AUTH_TYPE_VALUE,
+      [WECHAT_HTTP_HEADERS.UIN]: CryptoUtils.randomWechatUin(),
+      [WECHAT_HTTP_HEADERS.APP_ID]: this.config.appId,
+      [WECHAT_HTTP_HEADERS.CLIENT_VERSION]: String(this.clientVersionInt),
     };
 
     if (bodyString) {

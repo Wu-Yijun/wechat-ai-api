@@ -7,12 +7,23 @@ export interface WeChatClientConfig {
   version: string;
   /** 基础 API 地址，通常为 https://ilinkai.weixin.qq.com */
   baseUrl: string;
+  /** 默认机器人类型, 为 "3" */
+  bot_type: string;
   /** 机器人的登录凭证，登录前可为空 */
   token?: string;
   /** 收到图片/文件/视频时，是否在后台自动下载解密到内存中？默认 true */
   autoDownloadMedia: boolean;
   /** 用户 ID */
   userId?: string;
+}
+
+export interface CdnManagerConfig {
+  // CDN 物理传输极易受到网络波动影响，固定死 3 次在网络差的环境下可能不够，在极速环境下又显得多余
+  maxRetry: number;
+  // "https://cdn.weixin.qq.com";
+  cdnBaseUrl: string;
+  apiTimeoutMs: number;
+  backoffBaseMs: number;
 }
 
 export interface SendMessageOptions {
@@ -52,16 +63,16 @@ export interface LoginCredentials {
 
 export type LogStatusChangePayload =
   | {
-    status: "wait" | "scaned" | "expired";
+    status: LoginStatus.WAIT | LoginStatus.SCANNED | LoginStatus.EXPIRED;
     message: string;
   }
   | {
-    status: "scaned_but_redirect";
+    status: LoginStatus.REDIRECT;
     message: string;
     redirect_host: string; // 服务器要求重定向的新 host
   }
   | {
-    status: "confirmed";
+    status: LoginStatus.CONFIRMED;
     message: string;
     bot_token: string; // 登录成功后返回的 token
     baseurl?: string; // 登录成功后返回的 baseUrl（如果有的话）
@@ -286,4 +297,12 @@ export interface WeChatApiEventMap {
   video: [msg: WeChatIncomingMessage<RawMessageVideoItem>];
   voice: [msg: WeChatIncomingMessage<RawMessageVoiceItem>];
   error: [error: Error];
+}
+
+export const enum LoginStatus {
+  WAIT = "wait",
+  SCANNED = "scaned", // 保持和微信接口错别字一致
+  REDIRECT = "scaned_but_redirect",
+  CONFIRMED = "confirmed",
+  EXPIRED = "expired",
 }

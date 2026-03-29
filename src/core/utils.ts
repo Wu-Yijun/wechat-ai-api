@@ -34,7 +34,7 @@ export function getItemType(item: MessageItemType): ItemTypeStr {
   }
 }
 
-/** 将 "2.1.1" 转换为 API 要求的数字位运算格式 */
+/** 将 "2.1.1" 等版本号转换为 API 要求的数字位运算格式 */
 export function buildClientVersion(version: string): number {
   const parts = version.split(".").map((p) => parseInt(p, 10));
   const major = parts[0] || 0;

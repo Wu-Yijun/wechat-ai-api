@@ -6,7 +6,13 @@ import { MessageManager } from "./managers/MessageManager.ts";
 import { CdnManager } from "./managers/CdnManager.ts";
 import { MessageParser } from "./managers/MessageParser.ts";
 import { mergeObjects } from "./core/utils.ts";
-import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
+import {
+  DEFAULT_CLIENT_CONFIG,
+  DEFAULT_LOGIN_OPTIONS,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  LONG_POLLING_TIMEOUT_MS,
+  POLLING_ERROR_RETRY_DELAY_MS,
+} from "./constants.ts";
 import type {
   LoginCredentials,
   LoginOptions,
@@ -121,20 +127,31 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
     }
 
     try {
-      // ⚠️ 留空标注: 这里需要实现真实的有效性探测逻辑。
-      // 通常的实现方案是：调用一次不需要发消息的轻量级 API 接口。
-      // 比如：
-      // const res = await this.core.request("ilink/bot/getconfig", { method: "POST" });
-      // 如果返回错误码 (如 errcode === -14 或 HTTP 401)，则认为凭证失效。
+      // 使用 getconfig 作为一个轻量级的 Ping 探针
+      const response = await this.core.request<any>("ilink/bot/getconfig", {
+        method: "POST",
+        body: {
+          ilink_user_id: this.currentCredentials.userId,
+        },
+        timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+      });
 
-      console.log(
-        "[WeChatApi] 正在验证凭证有效性... (此接口逻辑待具体 API 完善)",
-      );
+      // 只要 ret 不报错，就说明 Token 有效
+      if (response.ret !== undefined && response.ret !== 0) {
+        console.warn(
+          `[WeChatApi] 凭证已失效 (Server returned: ${
+            response.errcode || response.ret
+          })`,
+        );
+        return false;
+      }
 
-      // 假设当前永远返回 true
       return true;
     } catch (error) {
-      console.error("[WeChatApi] 凭证验证失败，可能已过期:", error);
+      console.error(
+        "[WeChatApi] 凭证验证失败，网络异常或已过期:",
+        (error as Error).message,
+      );
       return false;
     }
   }
@@ -167,7 +184,7 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
           {
             method: "POST",
             body: { get_updates_buf: this.syncBuf },
-            timeoutMs: 35000, // 长轮询标准超时时间
+            timeoutMs: LONG_POLLING_TIMEOUT_MS, // 长轮询标准超时时间
           },
         );
 
@@ -219,7 +236,9 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
         console.error(
           `[WeChatApi] ⚠️ 轮询遇到网络异常，3秒后重试: ${error.message}`,
         );
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) =>
+          setTimeout(resolve, POLLING_ERROR_RETRY_DELAY_MS)
+        );
       }
     }
 

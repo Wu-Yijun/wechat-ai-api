@@ -1,20 +1,29 @@
 // src/managers/CdnManager.ts
 import { WeChatCore } from "../core/WeChatCore.ts";
 import { CryptoUtils } from "../core/CryptoUtils.ts";
+import {
+  AES_BLOCK_SIZE,
+  DEFAULT_CDN_CONFIG,
+  WECHAT_HTTP_HEADERS,
+} from "../constants.ts";
 import type {
   CdnDownloadTicket,
   CdnFileTicket,
+  CdnManagerConfig,
   UploadMediaType,
 } from "../types.ts";
+import { mergeObjects } from "../core/utils.ts";
 
 export class CdnManager {
   private core: WeChatCore;
+  private config: CdnManagerConfig;
 
-  // 📝 [待重构]: 未来这个值可以从 WeChatApiOptions 中读取
-  private readonly DEFAULT_CDN_BASE_URL = "https://cdn.weixin.qq.com";
-
-  constructor(core: WeChatCore) {
+  constructor(
+    core: WeChatCore,
+    config: Partial<CdnManagerConfig> = DEFAULT_CDN_CONFIG,
+  ) {
     this.core = core;
+    this.config = mergeObjects(DEFAULT_CDN_CONFIG, config);
   }
 
   // ==========================================
@@ -40,8 +49,10 @@ export class CdnManager {
     const filesize = CryptoUtils.getPaddedSize(rawsize); // AES 加密后的对齐大小
 
     // 微信要求 aeskey 和 filekey 都是 16 字节
-    const filekey = CryptoUtils.generateRandomKey(16).toString("hex");
-    const aeskeyBuffer = CryptoUtils.generateRandomKey(16);
+    const filekey = CryptoUtils.generateRandomKey(AES_BLOCK_SIZE).toString(
+      "hex",
+    );
+    const aeskeyBuffer = CryptoUtils.generateRandomKey(AES_BLOCK_SIZE);
     const aeskeyHex = aeskeyBuffer.toString("hex");
 
     // --------------------------------------------------
@@ -61,7 +72,7 @@ export class CdnManager {
           no_need_thumb: true, // 📝 [待重构]: 暂时忽略缩略图逻辑，全部设为 true
           aeskey: aeskeyHex,
         },
-        timeoutMs: 15_000,
+        timeoutMs: this.config.apiTimeoutMs,
       },
     );
 
@@ -71,7 +82,7 @@ export class CdnManager {
     if (uploadUrlResp.upload_full_url?.trim()) {
       cdnUrl = uploadUrlResp.upload_full_url.trim();
     } else if (uploadUrlResp.upload_param) {
-      cdnUrl = `${this.DEFAULT_CDN_BASE_URL}/upload?encrypted_query_param=${
+      cdnUrl = `${this.config.cdnBaseUrl}/upload?encrypted_query_param=${
         encodeURIComponent(uploadUrlResp.upload_param)
       }&filekey=${encodeURIComponent(filekey)}`;
     } else {
@@ -112,8 +123,7 @@ export class CdnManager {
    * 包含 4xx 直接报错、5xx 重试的逻辑。
    */
   private async postToCdn(ciphertext: Buffer, cdnUrl: string): Promise<string> {
-    const MAX_RETRIES = 3; // 📝 [待重构]: 可提取为常量
-
+    const MAX_RETRIES = this.config.maxRetry;
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -126,23 +136,25 @@ export class CdnManager {
 
         // 1. 客户端错误 (4xx)：比如鉴权失败、参数错误，重试也没用，直接抛出
         if (res.status >= 400 && res.status < 500) {
-          const errMsg = res.headers.get("x-error-message") ??
+          const errMsg = res.headers.get(WECHAT_HTTP_HEADERS.ERROR_MSG) ??
             (await res.text());
           throw new Error(`[CdnClientError] HTTP ${res.status}: ${errMsg}`);
         }
 
         // 2. 服务端错误 (5xx)：比如网关超时，尝试重试
         if (res.status !== 200) {
-          const errMsg = res.headers.get("x-error-message") ??
+          const errMsg = res.headers.get(WECHAT_HTTP_HEADERS.ERROR_MSG) ??
             `HTTP ${res.status}`;
           throw new Error(`[CdnServerError]: ${errMsg}`);
         }
 
         // 3. 成功！从 Header 中寻找那把“钥匙”
-        const downloadParam = res.headers.get("x-encrypted-param");
+        const downloadParam = res.headers.get(
+          WECHAT_HTTP_HEADERS.ENCRYPTED_PARAM,
+        );
         if (!downloadParam) {
           throw new Error(
-            "[CdnManager] 上传成功，但响应头中缺少 x-encrypted-param",
+            `[CdnManager] 上传成功，但响应头中缺少 ${WECHAT_HTTP_HEADERS.ENCRYPTED_PARAM}`,
           );
         }
 
@@ -157,7 +169,9 @@ export class CdnManager {
 
         // 否则等待一会儿继续重试 (简易退避)
         if (attempt < MAX_RETRIES) {
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.config.backoffBaseMs * attempt)
+          );
         }
       }
     }
@@ -184,7 +198,7 @@ export class CdnManager {
       url = ticket.fullUrl;
     } else if (ticket.encryptedQueryParam) {
       // 如果没有 fullUrl，就按照规则拼接
-      url = `${this.DEFAULT_CDN_BASE_URL}/download?encrypted_query_param=${
+      url = `${this.config.cdnBaseUrl}/download?encrypted_query_param=${
         encodeURIComponent(ticket.encryptedQueryParam)
       }`;
     } else {

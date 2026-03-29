@@ -4,7 +4,11 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 
 import { mergeObjects } from "../core/utils.ts";
-import { DEFAULT_SEND_OPTIONS } from "../constants.ts";
+import {
+  DEFAULT_API_TIMEOUT_MS,
+  DEFAULT_SEND_OPTIONS,
+  WECHAT_CDN_ENCRYPT_TYPE,
+} from "../constants.ts";
 import { CryptoUtils } from "../core/CryptoUtils.ts";
 import {
   MessageItemType,
@@ -130,7 +134,7 @@ export class MessageManager {
     const mediaObj = {
       encrypt_query_param: ticket.encryptedQueryParam,
       aes_key: Buffer.from(ticket.aeskeyHex).toString("base64"), // JSON 中要求 base64 格式
-      encrypt_type: 1,
+      encrypt_type: WECHAT_CDN_ENCRYPT_TYPE,
     };
 
     let messageItem: any = {};
@@ -182,12 +186,12 @@ export class MessageManager {
 
     const requestBody: any = {
       msg: {
-        from_user_id: "",
+        from_user_id: "", // 留空，微信网关会自动通过 Bearer Token 识别机器人身份
         to_user_id: userId,
         client_id: clientId,
         message_type: MessageType.BOT,
         message_state: MessageState.FINISH,
-        contextToken: contextToken,
+        context_token: contextToken,
         item_list: [itemObj],
       },
     };
@@ -195,7 +199,7 @@ export class MessageManager {
     const response = await this.core.request("ilink/bot/sendmessage", {
       method: "POST",
       body: requestBody,
-      timeoutMs: 15000,
+      timeoutMs: DEFAULT_API_TIMEOUT_MS,
     });
 
     return { clientId, response };

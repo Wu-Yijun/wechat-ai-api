@@ -1,11 +1,21 @@
 // src/managers/AuthManager.ts
+import {
+  BACKOFF_BASE_MS,
+  DEFAULT_LOGIN_MAX_RETRIES,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  LONG_POLLING_TIMEOUT_MS,
+  QR_CODE_EXPIRATION_MS,
+} from "../constants.ts";
 import { WeChatCore } from "../core/WeChatCore.ts";
-import type { LoginCredentials, LoginOptions, QrCodeInfo } from "../types.ts";
+import {
+  type LoginCredentials,
+  type LoginOptions,
+  LoginStatus,
+  type QrCodeInfo,
+} from "../types.ts";
 
 export class AuthManager {
   private core: WeChatCore;
-  private readonly DEFAULT_BOT_TYPE = "3";
-  private readonly FIXED_BASE_URL = "https://ilinkai.weixin.qq.com";
 
   constructor(core: WeChatCore) {
     this.core = core;
@@ -16,11 +26,11 @@ export class AuthManager {
   // ==========================================
   public async getQrCode(): Promise<QrCodeInfo> {
     // 强制使用默认的登录网关获取二维码
-    this.core.setBaseUrl(this.FIXED_BASE_URL);
+    this.core.setBaseUrl(this.core.getBaseUrl()); // 触发内部状态更新，确保使用默认 BaseUrl
 
     const response = await this.core.request<any>(
-      `ilink/bot/get_bot_qrcode?bot_type=${this.DEFAULT_BOT_TYPE}`,
-      { method: "GET", timeoutMs: 10000 },
+      `ilink/bot/get_bot_qrcode?bot_type=${this.core.getBotType()}`,
+      { method: "GET", timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS },
     );
 
     return {
@@ -34,8 +44,8 @@ export class AuthManager {
   // ==========================================
   public async pollLoginStatus(
     qrcodeId: string,
-    timeoutMs = 35000,
-  ): Promise<{ status: string; data?: any }> {
+    timeoutMs = LONG_POLLING_TIMEOUT_MS,
+  ): Promise<{ status: LoginStatus; data?: any }> {
     try {
       const response = await this.core.request<any>(
         `ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qrcodeId)}`,
@@ -45,7 +55,7 @@ export class AuthManager {
     } catch (err: any) {
       // 区分普通网络错误和长轮询的正常超时 (AbortError)
       if (err.name === "AbortError") {
-        return { status: "wait" }; // 超时视为继续等待
+        return { status: LoginStatus.WAIT }; // 超时视为继续等待
       }
       throw err;
     }
@@ -55,7 +65,7 @@ export class AuthManager {
   // 粗粒度 API: 一键自动托管登录
   // ==========================================
   public async login(options: LoginOptions): Promise<LoginCredentials> {
-    const maxRetries = options.maxRetries ?? 3;
+    const maxRetries = options.maxRetries ?? DEFAULT_LOGIN_MAX_RETRIES;
     let currentRetry = 0;
 
     while (currentRetry <= maxRetries) {
@@ -65,7 +75,7 @@ export class AuthManager {
 
       // 2. 开始持续轮询该二维码
       // 设置一个总超时，防止死循环 (比如 5 分钟二维码一定会过期)
-      const qrDeadline = Date.now() + 5 * 60 * 1000;
+      const qrDeadline = Date.now() + QR_CODE_EXPIRATION_MS;
 
       while (Date.now() < qrDeadline) {
         const { status, data } = await this.pollLoginStatus(
@@ -74,35 +84,35 @@ export class AuthManager {
         );
 
         switch (status) {
-          case "wait":
+          case LoginStatus.WAIT:
             options.onStatusChange?.({
-              status: "wait",
+              status: LoginStatus.WAIT,
               message: "等待扫码...",
             });
             break;
 
-          case "scaned":
+          case LoginStatus.SCANNED:
             options.onStatusChange?.({
-              status: "scaned",
+              status: LoginStatus.SCANNED,
               message: "已扫码，请在手机端确认...",
             });
             break;
 
-          case "scaned_but_redirect":
+          case LoginStatus.REDIRECT:
             if (data.redirect_host) {
               const newBaseUrl = `https://${data.redirect_host}`;
               this.core.setBaseUrl(newBaseUrl); // 关键：更新底层引擎的 BaseUrl
               options.onStatusChange?.({
-                status: "scaned_but_redirect",
+                status: LoginStatus.REDIRECT,
                 message: `服务器要求重定向至: ${newBaseUrl}`,
                 redirect_host: data.redirect_host,
               });
             }
             break;
 
-          case "confirmed":
+          case LoginStatus.CONFIRMED:
             options.onStatusChange?.({
-              status: "confirmed",
+              status: LoginStatus.CONFIRMED,
               message: "登录成功！",
               bot_token: data.bot_token,
               baseurl: data.baseurl,
@@ -116,7 +126,6 @@ export class AuthManager {
             if (data.baseurl) {
               this.core.setBaseUrl(data.baseurl);
             }
-            console.warn("debug", data);
 
             // 返回凭据给开发者，以便他们持久化存储
             return {
@@ -126,9 +135,9 @@ export class AuthManager {
               userId: data.ilink_user_id,
             };
 
-          case "expired":
+          case LoginStatus.EXPIRED:
             options.onStatusChange?.({
-              status: "expired",
+              status: LoginStatus.EXPIRED,
               message: "二维码已过期，正在重新获取...",
             });
             // 跳出内层轮询，触发外层循环重新获取二维码
@@ -136,15 +145,15 @@ export class AuthManager {
 
           default:
             // 未知状态，稍作延迟后继续尝试
-            await new Promise((res) => setTimeout(res, 1000));
+            await new Promise((res) => setTimeout(res, BACKOFF_BASE_MS));
         }
 
-        if (status === "expired") {
+        if (status === LoginStatus.EXPIRED) {
           break; // 跳出内层 while 循环
         }
 
         // 防御性延迟，避免请求过于频繁
-        await new Promise((res) => setTimeout(res, 1000));
+        await new Promise((res) => setTimeout(res, BACKOFF_BASE_MS));
       }
 
       currentRetry++;
