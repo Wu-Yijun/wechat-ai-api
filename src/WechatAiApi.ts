@@ -4,27 +4,18 @@ import { WeChatCore } from "./core/WeChatCore.ts";
 import { AuthManager } from "./managers/AuthManager.ts";
 import { MessageManager } from "./managers/MessageManager.ts";
 import { CdnManager } from "./managers/CdnManager.ts";
+import { MessageParser } from "./managers/MessageParser.ts";
 import { mergeObjects } from "./core/utils.ts";
 import { DEFAULT_CLIENT_CONFIG, DEFAULT_LOGIN_OPTIONS } from "./constants.ts";
 import type {
   LoginCredentials,
   LoginOptions,
+  PollingResult,
+  WeChatApiEventMap,
   WeChatClientConfig,
-  WeChatIncomingMessage,
 } from "./types.ts";
-import { MessageParser } from "./managers/MessageParser.ts";
 
 
-interface WeChatApiEventMap {
-  login: [credentials: LoginCredentials];
-  message: [msg: WeChatIncomingMessage];
-  text: [msg: WeChatIncomingMessage];
-  file: [msg: WeChatIncomingMessage];
-  image: [msg: WeChatIncomingMessage];
-  video: [msg: WeChatIncomingMessage];
-  voice: [msg: WeChatIncomingMessage];
-  error: [error: Error];
-}
 
 export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
   public readonly core: WeChatCore;
@@ -173,7 +164,7 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
     while (this.isPolling) {
       try {
         // 核心：发起长轮询请求。这里会挂起长达 35 秒，直到有新消息或超时
-        const response = await this.core.request<any>("ilink/bot/getupdates", {
+        const response = await this.core.request<PollingResult>("ilink/bot/getupdates", {
           method: "POST",
           body: { get_updates_buf: this.syncBuf },
           timeoutMs: 35000, // 长轮询标准超时时间
@@ -210,7 +201,7 @@ export class WeChatApi extends EventEmitter<WeChatApiEventMap> {
             // 触发全局通用消息事件
             for (const msg of parsedMsgs) {
               this.emit("message", msg);
-              if (msg.msgType && msg.msgType !== "unknown") this.emit(msg.msgType, msg);
+              if (msg.msgType && msg.msgType !== "unknown") this.emit(msg.msgType, msg as any);
             }
           }
         }

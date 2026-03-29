@@ -109,7 +109,7 @@ export interface CdnDownloadTicket {
 }
 
 // 对外暴露的消息对象结构
-export interface WeChatIncomingMessage {
+export interface WeChatIncomingMessage<T extends RawMessageItemBase = RawMessageItem> {
   messageId: string;
   seq: number;
   fromUserId: string;
@@ -139,7 +139,7 @@ export interface WeChatIncomingMessage {
   /** 消息在同一 seq 中的索引，方便开发者处理多 Item 的情况 */
   index: number;
   /** 原始消息载荷，给高级玩家使用 */
-  raw: any;
+  raw: RawMessage<T>;
 }
 
 export const MessageType = {
@@ -183,3 +183,110 @@ export type ItemType =
   | "file"
   | "voice"
   | "unknown";
+
+
+export interface PollingResult {
+  ret?: number | -2,
+  errcode?: number,
+  errmsg?: string,
+  get_updates_buf?: string,
+  msgs?: RawMessage[],
+}
+
+export interface RawMessage<T extends RawMessageItemBase = RawMessageItem> {
+  seq: number,
+  message_id: number,
+  from_user_id: string,
+  to_user_id: string,
+  client_id: string,
+  create_time_ms: number,
+  update_time_ms: number,
+  delete_time_ms: number | 0,
+  session_id: string | '',
+  group_id: string | '',
+  message_type: MessageType,
+  message_state: MessageState,
+  item_list: T[],
+  context_token: string
+}
+
+export type RawMessageItem = RawMessageTextItem | RawMessageFileItem | RawMessageImageItem | RawMessageVideoItem | RawMessageVoiceItem;
+
+export interface RawMessageItemBase {
+  type: MessageItemType,
+  create_time_ms: number,
+  update_time_ms: number,
+  is_completed: boolean,
+}
+
+export interface RawMessageTextItem extends RawMessageItemBase {
+  type: typeof MessageItemType.TEXT,
+  text_item: { text: string }
+}
+
+export interface RawMessageFileItem extends RawMessageItemBase {
+  type: typeof MessageItemType.FILE,
+  file_item: {
+    media: RawMessageMedia,
+    file_name: string,
+    md5: string,
+    len: string,
+  }
+}
+
+export interface RawMessageImageItem extends RawMessageItemBase {
+  type: typeof MessageItemType.IMAGE,
+  image_item: {
+    url: string,
+    aeskey: string,
+    media: RawMessageMedia,
+    mid_size: number,
+    thumb_size: number,
+    thumb_height: number,
+    thumb_width: number,
+    hd_size: number,
+  }
+}
+
+export interface RawMessageVideoItem extends RawMessageItemBase {
+  type: typeof MessageItemType.VIDEO,
+  video_item: {
+    media: RawMessageMedia,
+    video_size: number,
+    play_length: number,
+    video_md5: string,
+    thumb_media: RawMessageMedia,
+    thumb_size: number,
+    thumb_height: number,
+    thumb_width: number,
+  }
+}
+
+export interface RawMessageVoiceItem extends RawMessageItemBase {
+  type: typeof MessageItemType.VOICE,
+  voice_item: {
+    media: RawMessageMedia,
+    encode_type: number | 4,
+    bits_per_sample: number | 16,
+    sample_rate: number | 16000,
+    playtime: number,
+    text: string | ''
+  }
+}
+
+export interface RawMessageMedia {
+  encrypt_query_param: string,
+  aes_key: string,
+  full_url: string,
+}
+
+export interface WeChatApiEventMap {
+  login: [credentials: LoginCredentials];
+  message: [msg: WeChatIncomingMessage];
+  text: [msg: WeChatIncomingMessage<RawMessageTextItem>];
+  file: [msg: WeChatIncomingMessage<RawMessageFileItem>];
+  image: [msg: WeChatIncomingMessage<RawMessageImageItem>];
+  video: [msg: WeChatIncomingMessage<RawMessageVideoItem>];
+  voice: [msg: WeChatIncomingMessage<RawMessageVoiceItem>];
+  error: [error: Error];
+}

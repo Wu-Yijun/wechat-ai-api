@@ -1,10 +1,10 @@
 // src/managers/MessageParser.ts
 
 import type { CdnManager } from "./CdnManager.ts";
-import type { CdnDownloadTicket, ItemType, WeChatClientConfig, WeChatIncomingMessage } from "../types.ts";
+import type { CdnDownloadTicket, ItemType, RawMessage, RawMessageItem, WeChatClientConfig, WeChatIncomingMessage } from "../types.ts";
 import { silkToWav } from "../core/SilkConverter.ts";
 import { writeFile } from "node:fs/promises";
-import { getItemType, mergeObjects } from "../core/utils.ts";
+import { getFileImageItem, getItemType, mergeObjects } from "../core/utils.ts";
 
 export class MessageParser {
   private cdn: CdnManager;
@@ -14,12 +14,12 @@ export class MessageParser {
     this.cdn = cdn;
     this.config = config;
   }
-  
+
   /**
    * 将微信底层的复杂 JSON 扁平化为开发者友好的对象
    */
-  public async parse(raw: any): Promise<WeChatIncomingMessage[] | null> {
-     // 过滤掉系统消息或无内容的空包
+  public async parse(raw: RawMessage): Promise<WeChatIncomingMessage[] | null> {
+    // 过滤掉系统消息或无内容的空包
     if (!raw.item_list || raw.item_list.length === 0) return [];
 
     const results: WeChatIncomingMessage[] = [];
@@ -47,6 +47,7 @@ export class MessageParser {
       if (itemType !== "text" && itemType !== "unknown") {
         let cachedBuffer: Buffer | null = null;
         const ticket = this._extractDownloadTicket(item, itemType);
+        msgCopy.fileName = ticket?.originalFileName;
         msgCopy.mediaTicket = ticket;
         msgCopy.getBuffer = async () => {
           if (cachedBuffer) return cachedBuffer;
@@ -87,18 +88,17 @@ export class MessageParser {
     return results;
   }
 
-  
+
   /**
    * 从原始 JSON 中提取标准化的 CDN 下载票据
    */
   private _extractDownloadTicket(
-    item: any,
+    item: RawMessageItem,
     itemType: ItemType,
   ): CdnDownloadTicket | undefined {
     if (itemType === "text" || itemType === "unknown") return undefined; // 纯文本没有下载票
 
-    const file_item = item.image_item ?? item.file_item ?? item.video_item ??
-      item.voice_item;
+    const file_item = getFileImageItem(item);
     if (!file_item || !file_item.media) return undefined;
     const media = file_item.media;
 
@@ -109,7 +109,7 @@ export class MessageParser {
     let aesKeyBase64 = media.aes_key;
 
     // ⚠️ 协议特例：图片类型有时会把密钥放在外层，而且是 Hex 格式
-    if (itemType === "image" && file_item.aeskey) {
+    if (itemType === "image" && 'aeskey' in file_item && file_item.aeskey) {
       // 统一转成 Base64，方便 CdnManager 统一处理
       aesKeyBase64 = Buffer.from(file_item.aeskey, "hex").toString("base64");
     }
@@ -123,7 +123,7 @@ export class MessageParser {
       encryptedQueryParam: media.encrypt_query_param,
       aesKeyBase64,
       isPlain,
-      originalFileName: file_item.file_name || file_item.originalFileName,
-    };
+      originalFileName: 'file_name' in file_item ? file_item.file_name : undefined
+    }
   }
 }
